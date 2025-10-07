@@ -6,7 +6,8 @@ import {
   logout,
   forgotPassword,
   verifyOTP,
-  resetPassword
+  resetPassword,
+  updateProfile
 } from '../controllers/auth.controller.js';
 
 const router = express.Router();
@@ -23,14 +24,16 @@ router.patch('/reset-password/:token', resetPassword);
 router.use(protect);
 
 // User profile routes
-router.get('/me', (req, res) => {
-  res.status(200).json({
-    status: 'success',
-    data: {
-      user: req.user,
-    },
-  });
-});
+router.route('/me')
+  .get((req, res) => {
+    res.status(200).json({
+      status: 'success',
+      data: {
+        user: req.user,
+      },
+    });
+  })
+  .patch(updateProfile);
 
 // Logout route
 router.get('/logout', logout);

@@ -30,6 +30,20 @@ const userSchema = new mongoose.Schema({
     enum: ['user', 'admin'],
     default: 'user',
   },
+  gender: {
+    type: String,
+    enum: ['male', 'female', 'other', 'prefer-not-to-say'],
+    trim: true,
+  },
+  phone: {
+    type: String,
+    trim: true,
+    match: [/^[0-9\-+()\s]*$/, 'Please provide a valid phone number'],
+  },
+  country: {
+    type: String,
+    trim: true,
+  },
   passwordResetOTP: String,
   passwordResetToken: String,
   passwordResetExpires: Date,

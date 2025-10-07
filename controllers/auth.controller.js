@@ -228,6 +228,36 @@ export const protect = catchAsync(async (req, res, next) => {
   next();
 });
 
+export const updateProfile = catchAsync(async (req, res, next) => {
+  // 1) Filter out unwanted fields that are not allowed to be updated
+  const filteredBody = {};
+  const allowedFields = ['name', 'gender', 'phone', 'country'];
+  
+  Object.keys(req.body).forEach(key => {
+    if (allowedFields.includes(key)) {
+      filteredBody[key] = req.body[key];
+    }
+  });
+
+  // 2) Update user document
+  const updatedUser = await User.findByIdAndUpdate(
+    req.user.id,
+    filteredBody,
+    {
+      new: true,
+      runValidators: true,
+    }
+  );
+
+  // 3) Send response
+  res.status(200).json({
+    status: 'success',
+    data: {
+      user: updatedUser,
+    },
+  });
+});
+
 export const restrictTo = (...roles) => {
   return (req, res, next) => {
     // roles ['admin', 'lead-guide']. role='user'
