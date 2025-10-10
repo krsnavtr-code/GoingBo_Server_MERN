@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import userRouter from './routes/user.routes.js';
+import adminRouter from './routes/admin.routes.js';
 import AppError from './utils/appError.js';
 
 // Configure __dirname for ES modules
@@ -31,6 +32,7 @@ app.use(morgan('dev'));
 
 // Routes
 app.use('/api/v1/users', userRouter);
+app.use('/api/v1/admin', adminRouter);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
