@@ -7,6 +7,7 @@ import {
   deleteUser,
   getDashboardStats
 } from '../controllers/admin.controller.js';
+import profileRouter from './profile.routes.js';
 
 const router = express.Router();
 
@@ -17,6 +18,9 @@ router.use(restrictTo('admin'));
 
 // Dashboard
 router.get('/dashboard', getDashboardStats);
+
+// Profile routes
+router.use('/profile', profileRouter);
 
 // User management
 router.route('/users')
