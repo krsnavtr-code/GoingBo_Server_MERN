@@ -8,6 +8,7 @@ import {
   getDashboardStats
 } from '../controllers/admin.controller.js';
 import profileRouter from './profile.routes.js';
+import mediaRouter from './media.routes.js';
 
 const router = express.Router();
 
@@ -21,6 +22,9 @@ router.get('/dashboard', getDashboardStats);
 
 // Profile routes
 router.use('/profile', profileRouter);
+
+// Media routes
+router.use('/media', mediaRouter);
 
 // User management
 router.route('/users')

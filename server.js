@@ -9,7 +9,9 @@ import { dirname, join } from 'path';
 import userRouter from './routes/user.routes.js';
 import adminRouter from './routes/admin.routes.js';
 import publicRouter from './routes/public.routes.js';
-import AppError from './utils/appError.js';
+import mediaRouter from './routes/media.routes.js';
+import path from 'path';
+import fs from 'fs';
 
 // Configure __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -21,20 +23,54 @@ dotenv.config({ path: join(__dirname, '.env') });
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(cors({
-  origin: true,
-  credentials: true // Allow cookies to be sent cross-origin
-}));
+
+// CORS Configuration
+const allowedOrigins = ['http://localhost:3000', 'http://127.0.0.1:3000'];
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Set-Cookie'],
+  optionsSuccessStatus: 200,
+  preflightContinue: false
+};
+
+// Enable CORS
+app.use(cors(corsOptions));
+
+// Remove the app.options('*', ...) handler completely
+
+// Other middleware
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
-app.use(cookieParser()); // Parse cookies
+app.use(cookieParser());
 app.use(morgan('dev'));
 
 // Routes
 app.use('/api/v1/users', userRouter);
 app.use('/api/v1/admin', adminRouter);
+app.use('/api/v1/media', mediaRouter);
 app.use('/api/v1', publicRouter);
+
+
+
+
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Serve static files from uploads directory
+app.use('/uploads', express.static(uploadsDir));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -67,10 +103,10 @@ app.use((req, res, next) => {
 // Error handling middleware
 const errorHandler = (err, req, res, next) => {
   console.error('Error:', err);
-  
+
   const statusCode = err.statusCode || 500;
   const status = err.status || 'error';
-  
+
   res.status(statusCode).json({
     status,
     message: err.message || 'Something went wrong!',
@@ -92,7 +128,7 @@ const startServer = async () => {
       useUnifiedTopology: true,
     });
     console.log('✅ Connected to MongoDB');
-    
+
     const server = app.listen(PORT, () => {
       console.log(`🚀 Server is running on port ${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
