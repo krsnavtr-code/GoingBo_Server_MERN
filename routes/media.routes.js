@@ -12,4 +12,7 @@ router.route('/')
 router.route('/:id')
   .delete(mediaController.deleteMedia);
 
+router.route('/:id/tags')
+  .patch(mediaController.updateMediaTags);
+
 export default router;

@@ -107,3 +107,35 @@ export const deleteMedia = async (req, res, next) => {
     next(error);
   }
 };
+
+
+export const updateMediaTags = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { tags } = req.body;
+
+    if (!Array.isArray(tags)) {
+      return next(new AppError('Tags must be an array', 400));
+    }
+
+    const media = await Media.findByIdAndUpdate(
+      id,
+      { tags },
+      { new: true, runValidators: true }
+    );
+
+    if (!media) {
+      return next(new AppError('No media found with that ID', 404));
+    }
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        media
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
