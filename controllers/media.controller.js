@@ -20,16 +20,18 @@ const storage = multer.diskStorage({
   },
 });
 
-// File filter for images and videos
+// File filter for images, videos, and PDFs
 const fileFilter = (req, file, cb) => {
-  const filetypes = /jpeg|jpg|png|gif|webp|mp4|webm|mov/;
-  const mimetype = filetypes.test(file.mimetype);
-  const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+  const allowedFileTypes = /jpeg|jpg|png|gif|webp|mp4|webm|mov|pdf/;
+  const allowedMimeTypes = /^image\/|^video\/|^application\/pdf$/;
+  
+  const isValidExtension = allowedFileTypes.test(path.extname(file.originalname).toLowerCase());
+  const isValidMimeType = allowedMimeTypes.test(file.mimetype);
 
-  if (mimetype && extname) {
+  if (isValidExtension && isValidMimeType) {
     return cb(null, true);
   }
-  cb(new AppError('Only image and video files are allowed!', 400));
+  cb(new AppError('Only image, video, and PDF files are allowed!', 400));
 };
 
 // Initialize multer upload
