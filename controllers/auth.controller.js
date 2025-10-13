@@ -4,7 +4,7 @@ import User from '../models/user.model.js';
 import AppError from '../utils/appError.js';
 import catchAsync from '../utils/catchAsync.js';
 import { generateOTP } from '../utils/otpGenerator.js';
-import sendEmail from '../utils/email.js';
+import { sendEmail } from '../utils/email.js';
 import crypto from 'crypto';
 
 const signToken = (id) => {
@@ -196,11 +196,11 @@ export const resetPassword = catchAsync(async (req, res, next) => {
 export const protect = catchAsync(async (req, res, next) => {
   // 1) Getting token and check of it's there
   let token;
-  
+
   // Check for token in Authorization header
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     token = req.headers.authorization.split(' ')[1];
-  } 
+  }
   // Check for token in cookies
   else if (req.cookies?.jwt) {
     token = req.cookies.jwt;
@@ -232,7 +232,7 @@ export const updateProfile = catchAsync(async (req, res, next) => {
   // 1) Filter out unwanted fields that are not allowed to be updated
   const filteredBody = {};
   const allowedFields = ['name', 'gender', 'phone', 'country'];
-  
+
   Object.keys(req.body).forEach(key => {
     if (allowedFields.includes(key)) {
       filteredBody[key] = req.body[key];

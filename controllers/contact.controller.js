@@ -1,20 +1,22 @@
 import Contact from '../models/contact.model.js';
 import { validationResult } from 'express-validator';
+import { sendEmail } from '../utils/email.js';
+
 
 export const submitContactForm = async (req, res) => {
   try {
     // Validate request
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ 
-        success: false, 
-        errors: errors.array() 
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
       });
     }
 
     const { name, email, subject, message } = req.body;
 
-    // Create new contact
+    // Save to database
     const newContact = new Contact({
       name,
       email,
@@ -22,10 +24,54 @@ export const submitContactForm = async (req, res) => {
       message,
     });
 
-    // Save to database
     await newContact.save();
 
-    // Send success response
+    try {
+      // Validate required environment variables
+      if (!process.env.ADMIN_EMAIL) {
+        console.error('ADMIN_EMAIL environment variable is not set');
+      }
+
+      // Send confirmation email to user
+      if (email) {
+        try {
+          await sendEmail({
+            to: email,
+            subject: `Thank you for contacting us, ${name}!`,
+            template: 'contactUser',
+            data: { name, email, subject, message }
+          });
+          console.log(`Confirmation email sent to: ${email}`);
+        } catch (userEmailError) {
+          console.error('Error sending confirmation email to user:', userEmailError);
+          // Continue with the request even if user email fails
+        }
+      } else {
+        console.warn('No user email provided, skipping confirmation email');
+      }
+
+      // Send notification to admin
+      if (process.env.ADMIN_EMAIL) {
+        try {
+          await sendEmail({
+            to: process.env.ADMIN_EMAIL,
+            subject: `New Contact Form Submission: ${subject || 'No Subject'}`,
+            template: 'contactAdmin',
+            data: { name, email, subject, message }
+          });
+          console.log(`Notification email sent to admin: ${process.env.ADMIN_EMAIL}`);
+        } catch (adminEmailError) {
+          console.error('Error sending notification email to admin:', adminEmailError);
+          // Continue with the request even if admin email fails
+        }
+      } else {
+        console.warn('ADMIN_EMAIL not set, skipping admin notification');
+      }
+    } catch (error) {
+      console.error('Unexpected error in email sending process:', error);
+      // Don't fail the request if email sending fails
+    }
+
     res.status(201).json({
       success: true,
       message: 'Your message has been sent successfully!',
@@ -57,7 +103,7 @@ export const getContactSubmissions = async (req, res) => {
 
     const { status, page = 1, limit = 10 } = req.query;
     const query = {};
-    
+
     if (status) {
       query.status = status;
     }
