@@ -28,7 +28,7 @@ const PORT = process.env.PORT || 3000;
 const allowedOrigins = ['http://localhost:3000', 'http://127.0.0.1:3000'];
 
 const corsOptions = {
-  origin: (origin, callback) => {
+  origin: function (origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -39,14 +39,11 @@ const corsOptions = {
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   exposedHeaders: ['Set-Cookie'],
-  optionsSuccessStatus: 200,
-  preflightContinue: false
+  optionsSuccessStatus: 200
 };
 
-// Enable CORS
+// Enable CORS with the specified options
 app.use(cors(corsOptions));
-
-// Remove the app.options('*', ...) handler completely
 
 // Other middleware
 app.use(express.json({ limit: '10kb' }));
