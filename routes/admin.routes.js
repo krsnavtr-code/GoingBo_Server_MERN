@@ -5,7 +5,11 @@ import {
   getUser, 
   updateUser, 
   deleteUser,
-  getDashboardStats
+  getDashboardStats,
+  getAllContacts,
+  getContact,
+  updateContactStatus,
+  getContactStats
 } from '../controllers/admin.controller.js';
 import profileRouter from './profile.routes.js';
 import mediaRouter from './media.routes.js';
@@ -26,6 +30,14 @@ router.use('/profile', profileRouter);
 
 // Media routes
 router.use('/media', mediaRouter);
+
+// Contact Form Submissions
+router.get('/contacts', getAllContacts);
+router.get('/contacts/stats', getContactStats);
+router
+  .route('/contacts/:id')
+  .get(getContact)
+  .patch(updateContactStatus);
 
 // Skill routes
 router.use('/skills', skillRouter);
