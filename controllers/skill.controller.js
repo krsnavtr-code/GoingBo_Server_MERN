@@ -2,6 +2,19 @@ import Skill from '../models/skill.model.js';
 import AppError from '../utils/appError.js';
 import catchAsync from '../utils/catchAsync.js';
 
+// Get all skills (public access)
+export const getAllPublicSkills = catchAsync(async (req, res, next) => {
+  const skills = await Skill.find({ active: true }).select('-__v');
+
+  res.status(200).json({
+    status: 'success',
+    results: skills.length,
+    data: {
+      skills
+    }
+  });
+});
+
 export const createSkill = catchAsync(async (req, res, next) => {
   const newSkill = await Skill.create(req.body);
 
