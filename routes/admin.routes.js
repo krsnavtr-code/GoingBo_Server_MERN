@@ -9,6 +9,7 @@ import {
 } from '../controllers/admin.controller.js';
 import profileRouter from './profile.routes.js';
 import mediaRouter from './media.routes.js';
+import skillRouter from './skill.routes.js';
 
 const router = express.Router();
 
@@ -25,6 +26,9 @@ router.use('/profile', profileRouter);
 
 // Media routes
 router.use('/media', mediaRouter);
+
+// Skill routes
+router.use('/skills', skillRouter);
 
 // User management
 router.route('/users')
