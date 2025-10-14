@@ -27,7 +27,7 @@ transporter.verify((error, success) => {
             user: process.env.EMAIL_USER ? 'Set' : 'Not Set'
         });
     } else {
-        console.log('Server is ready to take our messages');
+        console.log('Server is ready to send emails!');
     }
 });
 
