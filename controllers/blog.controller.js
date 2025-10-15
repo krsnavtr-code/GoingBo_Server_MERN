@@ -76,7 +76,22 @@ const getBlogs = asyncHandler(async (req, res, next) => {
   });
 });
 
-// @desc    Get single blog post
+// @desc    Get single blog post by slug
+// @route   GET /api/v1/blog/slug/:slug
+// @access  Public
+const getBlogBySlug = asyncHandler(async (req, res, next) => {
+  const blog = await Blog.findOne({ slug: req.params.slug });
+
+  if (!blog) {
+    return next(
+      new ErrorResponse(`Blog post not found with slug of ${req.params.slug}`, 404)
+    );
+  }
+
+  res.status(200).json({ success: true, data: blog });
+});
+
+// @desc    Get single blog post by ID
 // @route   GET /api/v1/blog/:id
 // @access  Public
 const getBlog = asyncHandler(async (req, res, next) => {
@@ -182,21 +197,12 @@ const updateBlog = asyncHandler(async (req, res, next) => {
     }
   }
 
-  // Validate featured image URL if provided
-  if (featuredImage) {
-    try {
-      new URL(featuredImage);
-    } catch (err) {
-      return next(new ErrorResponse('Invalid featured image URL', 400));
-    }
-  }
-
   // Update blog fields
   blog.title = title || blog.title;
   blog.slug = slug || blog.slug;
   blog.excerpt = excerpt || blog.excerpt;
   blog.content = content || blog.content;
-  blog.featuredImage = featuredImage || blog.featuredImage;
+  blog.featuredImage = featuredImage ? String(featuredImage) : blog.featuredImage;
   blog.tags = Array.isArray(tags) ? tags : [];
   blog.published = published !== undefined ? published : blog.published;
 
@@ -235,6 +241,7 @@ const deleteBlog = asyncHandler(async (req, res, next) => {
 export {
   getBlogs,
   getBlog,
+  getBlogBySlug,
   createBlog,
   updateBlog,
   deleteBlog

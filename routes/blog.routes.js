@@ -2,6 +2,7 @@ import express from 'express';
 import {
   getBlogs,
   getBlog,
+  getBlogBySlug,
   createBlog,
   updateBlog,
   deleteBlog
@@ -13,24 +14,24 @@ import { Blog } from '../models/blog.model.js';
 const router = express.Router();
 
 // Public routes
-router
-  .route('/')
+router.route('/')
   .get(advancedResults(Blog, 'author'), getBlogs);
 
-router
-  .route('/:id')
+// Route to get blog by slug
+router.route('/:slug')
+  .get(getBlogBySlug);
+
+router.route('/:id')
   .get(getBlog);
 
 // Protected routes (require authentication and authorization)
 router.use(protect);
 router.use(authorize('admin', 'publisher'));
 
-router
-  .route('/')
+router.route('/')
   .post(createBlog);
 
-router
-  .route('/:id')
+router.route('/:id')
   .put(updateBlog)
   .delete(deleteBlog);
 
