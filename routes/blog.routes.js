@@ -1,0 +1,37 @@
+import express from 'express';
+import {
+  getBlogs,
+  getBlog,
+  createBlog,
+  updateBlog,
+  deleteBlog
+} from '../controllers/blog.controller.js';
+import { protect, authorize } from '../middleware/auth.js';
+import advancedResults from '../middleware/advancedResults.js';
+import { Blog } from '../models/blog.model.js';
+
+const router = express.Router();
+
+// Public routes
+router
+  .route('/')
+  .get(advancedResults(Blog, 'author'), getBlogs);
+
+router
+  .route('/:id')
+  .get(getBlog);
+
+// Protected routes (require authentication and authorization)
+router.use(protect);
+router.use(authorize('admin', 'publisher'));
+
+router
+  .route('/')
+  .post(createBlog);
+
+router
+  .route('/:id')
+  .put(updateBlog)
+  .delete(deleteBlog);
+
+export default router;

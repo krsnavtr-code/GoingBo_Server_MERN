@@ -10,6 +10,7 @@ import userRouter from './routes/user.routes.js';
 import adminRouter from './routes/admin.routes.js';
 import publicRouter from './routes/public.routes.js';
 import mediaRouter from './routes/media.routes.js';
+import blogRoutes from './routes/blog.routes.js';
 import path from 'path';
 import fs from 'fs';
 
@@ -55,6 +56,7 @@ app.use(morgan('dev'));
 app.use('/api/v1/users', userRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/media', mediaRouter);
+app.use('/api/v1/blog', blogRoutes);
 app.use('/api/v1', publicRouter);
 
 
