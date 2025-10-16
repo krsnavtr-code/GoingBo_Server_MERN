@@ -17,12 +17,13 @@ const router = express.Router();
 router.route('/')
   .get(advancedResults(Blog, 'author'), getBlogs);
 
-// Route to get blog by slug
-router.route('/:slug')
-  .get(getBlogBySlug);
-
+// Get blog by ID - must come before slug route
 router.route('/:id')
   .get(getBlog);
+
+// Route to get blog by slug
+router.route('/slug/:slug')
+  .get(getBlogBySlug);
 
 // Protected routes (require authentication and authorization)
 router.use(protect);

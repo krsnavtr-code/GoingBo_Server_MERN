@@ -32,6 +32,35 @@ const blogSchema = new mongoose.Schema({
     trim: true,
     lowercase: true
   }],
+  categories: [{
+    type: String,
+    required: [true, 'At least one category is required'],
+    enum: {
+      values: [
+        'technology',
+        'programming',
+        'MERN Stack',
+        'Laravel',
+        'React',
+        'Database',
+        'web development',
+        'mobile development',
+        'artificial intelligence',
+        'cloud computing',
+        'cybersecurity',
+        'data science',
+        'devops',
+        'ui/ux',
+        'career',
+        'tutorials',
+        'opinion',
+        'news',
+        'other'
+      ],
+      message: 'Invalid category'
+    },
+    lowercase: true
+  }],
   author: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
