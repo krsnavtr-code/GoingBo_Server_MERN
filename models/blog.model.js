@@ -33,33 +33,20 @@ const blogSchema = new mongoose.Schema({
     lowercase: true
   }],
   categories: [{
-    type: String,
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'BlogCategory',
     required: [true, 'At least one category is required'],
-    enum: {
-      values: [
-        'technology',
-        'programming',
-        'MERN Stack',
-        'Laravel',
-        'React',
-        'Database',
-        'web development',
-        'mobile development',
-        'artificial intelligence',
-        'cloud computing',
-        'cybersecurity',
-        'data science',
-        'devops',
-        'ui/ux',
-        'career',
-        'tutorials',
-        'opinion',
-        'news',
-        'other'
-      ],
-      message: 'Invalid category'
-    },
-    lowercase: true
+    validate: {
+      validator: async function(categories) {
+        if (!Array.isArray(categories) || categories.length === 0) {
+          return false;
+        }
+        // Check if all category IDs exist
+        const count = await mongoose.model('BlogCategory').countDocuments({ _id: { $in: categories } });
+        return count === categories.length;
+      },
+      message: 'One or more categories are invalid'
+    }
   }],
   author: {
     type: mongoose.Schema.Types.ObjectId,
