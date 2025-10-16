@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { Blog } from '../models/blog.model.js';
 import ErrorResponse from '../utils/errorResponse.js';
 import asyncHandler from 'express-async-handler';
@@ -124,10 +125,40 @@ const createBlog = asyncHandler(async (req, res, next) => {
     content,
     featuredImage,
     tags,
+    categories = [],
     published,
     metaTitle,
     metaDescription,
   } = req.body;
+
+  // Validate categories
+  if (!Array.isArray(categories) || categories.length === 0) {
+    return next(new ErrorResponse('At least one category is required', 400));
+  }
+
+  // Ensure categories is an array (in case a single category is passed)
+  const categoriesArray = Array.isArray(categories) ? categories : [categories];
+
+  // Convert all category IDs to ObjectIds
+  const categoryIds = categoriesArray.map(id =>
+    id instanceof mongoose.Types.ObjectId ? id : new mongoose.Types.ObjectId(id)
+  );
+
+  console.log('Processing blog with category IDs:', categoryIds);
+
+  // Check if all categories exist
+  const existingCategories = await mongoose.model('BlogCategory').find({
+    _id: { $in: categoryIds }
+  });
+
+  console.log('Found existing categories:', existingCategories.map(c => c._id));
+
+  if (existingCategories.length !== categoryIds.length) {
+    const foundIds = new Set(existingCategories.map(c => c._id.toString()));
+    const missingIds = categoryIds.filter(id => !foundIds.has(id.toString()));
+    console.error('Missing category IDs:', missingIds);
+    return next(new ErrorResponse(`The following categories do not exist: ${missingIds.join(', ')}`, 400));
+  }
 
   // Check if blog with same slug already exists
   const blogExists = await Blog.findOne({ slug });
@@ -152,6 +183,7 @@ const createBlog = asyncHandler(async (req, res, next) => {
     content,
     featuredImage: featuredImage || '',
     tags: Array.isArray(tags) ? tags : [],
+    categories: categoryIds,
     published: published || false,
     meta: {
       title: metaTitle || title,
@@ -187,6 +219,7 @@ const updateBlog = asyncHandler(async (req, res, next) => {
     published,
     metaTitle,
     metaDescription,
+    categories,
   } = req.body;
 
   // Check if blog with same slug already exists (excluding current blog)
@@ -197,7 +230,36 @@ const updateBlog = asyncHandler(async (req, res, next) => {
     }
   }
 
-  // Update blog fields
+  // Handle categories update if provided
+  if (categories) {
+    // Ensure categories is an array (in case a single category is passed)
+    const categoriesArray = Array.isArray(categories) ? categories : [categories];
+
+    // Convert all category IDs to ObjectIds
+    const categoryIds = categoriesArray.map(id =>
+      id instanceof mongoose.Types.ObjectId ? id : new mongoose.Types.ObjectId(id)
+    );
+
+    console.log('Updating blog with category IDs:', categoryIds);
+
+    // Verify all categories exist
+    const existingCategories = await mongoose.model('BlogCategory').find({
+      _id: { $in: categoryIds }
+    });
+
+    console.log('Found existing categories for update:', existingCategories.map(c => c._id));
+
+    if (existingCategories.length !== categoryIds.length) {
+      const foundIds = new Set(existingCategories.map(c => c._id.toString()));
+      const missingIds = categoryIds.filter(id => !foundIds.has(id.toString()));
+      console.error('Missing category IDs during update:', missingIds);
+      return next(new ErrorResponse(`The following categories do not exist: ${missingIds.join(', ')}`, 400));
+    }
+
+    blog.categories = categoryIds;
+  }
+
+  // Update other blog fields
   blog.title = title || blog.title;
   blog.slug = slug || blog.slug;
   blog.excerpt = excerpt || blog.excerpt;

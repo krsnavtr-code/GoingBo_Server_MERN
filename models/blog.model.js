@@ -32,22 +32,48 @@ const blogSchema = new mongoose.Schema({
     trim: true,
     lowercase: true
   }],
-  categories: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'BlogCategory',
+  categories: {
+    type: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'BlogCategory'
+    }],
     required: [true, 'At least one category is required'],
     validate: {
       validator: async function(categories) {
-        if (!Array.isArray(categories) || categories.length === 0) {
+        // Convert single category to array if needed
+        const categoriesArray = Array.isArray(categories) ? categories : [categories];
+        
+        if (categoriesArray.length === 0) {
+          console.log('Validation failed: No categories provided');
           return false;
         }
-        // Check if all category IDs exist
-        const count = await mongoose.model('BlogCategory').countDocuments({ _id: { $in: categories } });
-        return count === categories.length;
+        
+        try {
+          // Convert all IDs to strings for consistent comparison
+          const categoryIds = categoriesArray.map(id => id.toString());
+          console.log('Looking for categories with IDs:', categoryIds);
+          
+          // Find all categories that match the IDs
+          const existingCategories = await mongoose.model('BlogCategory').find({
+            _id: { $in: categoryIds }
+          });
+          
+          console.log('Found categories:', existingCategories.map(c => c._id.toString()));
+          
+          // Check if we found all categories
+          const isValid = existingCategories.length === categoryIds.length;
+          if (!isValid) {
+            console.log('Validation failed: Not all categories found');
+          }
+          return isValid;
+        } catch (error) {
+          console.error('Error validating categories:', error);
+          return false;
+        }
       },
-      message: 'One or more categories are invalid'
+      message: 'One or more categories are invalid. Please ensure all categories exist.'
     }
-  }],
+  },
   author: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
