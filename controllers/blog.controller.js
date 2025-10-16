@@ -17,14 +17,40 @@ const getBlogs = asyncHandler(async (req, res, next) => {
   // Loop over removeFields and delete them from reqQuery
   removeFields.forEach(param => delete reqQuery[param]);
 
-  // Create query string
-  let queryStr = JSON.stringify(reqQuery);
+  // Create base query
+  let query = Blog.find();
 
-  // Create operators ($gt, $gte, etc)
-  queryStr = queryStr.replace(/\b(gt|gte|lt|lte|in)\b/g, match => `$${match}`);
+  // Apply published filter for non-admin users
+  if (!req.user?.role || req.user.role !== 'admin') {
+    query = query.where('published').equals(true);
+  }
 
-  // Finding resource
-  let query = Blog.find(JSON.parse(queryStr));
+  // Handle category filter
+  if (req.query.category) {
+    try {
+      const categoryId = new mongoose.Types.ObjectId(req.query.category);
+      query = query.where('categories').equals(categoryId);
+      console.log('Filtering by category ID:', categoryId);
+    } catch (err) {
+      console.error('Invalid category ID:', req.query.category, err);
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid category ID format'
+      });
+    }
+  }
+
+  // Apply other filters from reqQuery (search, etc.)
+  Object.keys(reqQuery).forEach(key => {
+    if (key !== 'select' && key !== 'sort' && key !== 'page' && key !== 'limit' && key !== 'category') {
+      if (reqQuery[key]) {  // Only add filter if value is not empty
+        query = query.where(key).equals(reqQuery[key]);
+      }
+    }
+  });
+
+  // Debug: Log the final query
+  console.log('Final query filter:', query.getFilter());
 
   // Select Fields
   if (req.query.select) {
@@ -45,7 +71,45 @@ const getBlogs = asyncHandler(async (req, res, next) => {
   const limit = parseInt(req.query.limit, 10) || 10;
   const startIndex = (page - 1) * limit;
   const endIndex = page * limit;
-  const total = await Blog.countDocuments(JSON.parse(queryStr));
+  const total = await Blog.countDocuments(query.getFilter());
+
+  query = query.skip(startIndex).limit(limit);
+
+  // Populate categories
+  query = query.populate('categories', 'name _id');
+
+  // Execute query
+  const results = await query;
+
+  // Pagination result
+  const pagination = {};
+  if (endIndex < total) {
+    pagination.next = {
+      page: page + 1,
+      limit
+    };
+  }
+
+  if (startIndex > 0) {
+    pagination.prev = {
+      page: page - 1,
+      limit
+    };
+  }
+
+  res.status(200).json({
+    success: true,
+    count: results.length,
+    pagination,
+    data: results
+  });
+
+  // // Pagination
+  // const page = parseInt(req.query.page, 10) || 1;
+  // const limit = parseInt(req.query.limit, 10) || 10;
+  // const startIndex = (page - 1) * limit;
+  // const endIndex = page * limit;
+  // const total = await Blog.countDocuments(JSON.parse(queryStr));
 
   query = query.skip(startIndex).limit(limit);
 
@@ -53,7 +117,7 @@ const getBlogs = asyncHandler(async (req, res, next) => {
   const blogs = await query;
 
   // Pagination result
-  const pagination = {};
+  // const pagination = {};
 
   if (endIndex < total) {
     pagination.next = {
@@ -81,7 +145,8 @@ const getBlogs = asyncHandler(async (req, res, next) => {
 // @route   GET /api/v1/blog/slug/:slug
 // @access  Public
 const getBlogBySlug = asyncHandler(async (req, res, next) => {
-  const blog = await Blog.findOne({ slug: req.params.slug });
+  const blog = await Blog.findOne({ slug: req.params.slug })
+    .populate('categories', 'name _id');
 
   if (!blog) {
     return next(
@@ -96,7 +161,7 @@ const getBlogBySlug = asyncHandler(async (req, res, next) => {
 // @route   GET /api/v1/blog/:id
 // @access  Public
 const getBlog = asyncHandler(async (req, res, next) => {
-  const blog = await Blog.findById(req.params.id);
+  const blog = await Blog.findById(req.params.id).populate('categories', 'name _id');
 
   if (!blog) {
     return next(

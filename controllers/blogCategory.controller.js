@@ -11,10 +11,24 @@ const getBlogCategories = asyncHandler(async (req, res, next) => {
   const categories = await BlogCategory.find({ isActive: true })
     .sort({ name: 1 });
   
+  // Get blog count for each category
+  const categoriesWithCount = await Promise.all(
+    categories.map(async (category) => {
+      const blogCount = await mongoose.model('Blog').countDocuments({
+        categories: category._id,
+        published: true
+      });
+      return {
+        ...category.toObject(),
+        blogCount
+      };
+    })
+  );
+  
   res.status(200).json({
     success: true,
-    count: categories.length,
-    data: categories
+    count: categoriesWithCount.length,
+    data: categoriesWithCount
   });
 });
 
