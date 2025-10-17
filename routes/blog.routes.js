@@ -5,7 +5,8 @@ import {
   getBlogBySlug,
   createBlog,
   updateBlog,
-  deleteBlog
+  deleteBlog,
+  filterPublishedBlogs
 } from '../controllers/blog.controller.js';
 import { protect, authorize } from '../middleware/auth.js';
 import advancedResults from '../middleware/advancedResults.js';
@@ -15,7 +16,7 @@ const router = express.Router();
 
 // Public routes
 router.route('/')
-  .get(advancedResults(Blog, 'author'), getBlogs);
+  .get(filterPublishedBlogs, advancedResults(Blog, 'author categories'), getBlogs);
 
 // Get blog by ID - must come before slug route
 router.route('/:id')

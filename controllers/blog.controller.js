@@ -8,138 +8,18 @@ import path from 'path';
 // @route   GET /api/v1/blog
 // @access  Public
 const getBlogs = asyncHandler(async (req, res, next) => {
-  // Copy req.query
-  const reqQuery = { ...req.query };
-
-  // Fields to exclude
-  const removeFields = ['select', 'sort', 'page', 'limit'];
-
-  // Loop over removeFields and delete them from reqQuery
-  removeFields.forEach(param => delete reqQuery[param]);
-
-  // Create base query
-  let query = Blog.find();
-
-  // Apply published filter for non-admin users
-  if (!req.user?.role || req.user.role !== 'admin') {
-    query = query.where('published').equals(true);
-  }
-
-  // Handle category filter
-  if (req.query.category) {
-    try {
-      const categoryId = new mongoose.Types.ObjectId(req.query.category);
-      query = query.where('categories').equals(categoryId);
-      console.log('Filtering by category ID:', categoryId);
-    } catch (err) {
-      console.error('Invalid category ID:', req.query.category, err);
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid category ID format'
-      });
-    }
-  }
-
-  // Apply other filters from reqQuery (search, etc.)
-  Object.keys(reqQuery).forEach(key => {
-    if (key !== 'select' && key !== 'sort' && key !== 'page' && key !== 'limit' && key !== 'category') {
-      if (reqQuery[key]) {  // Only add filter if value is not empty
-        query = query.where(key).equals(reqQuery[key]);
-      }
-    }
-  });
-
-  // Debug: Log the final query
-  console.log('Final query filter:', query.getFilter());
-
-  // Select Fields
-  if (req.query.select) {
-    const fields = req.query.select.split(',').join(' ');
-    query = query.select(fields);
-  }
-
-  // Sort
-  if (req.query.sort) {
-    const sortBy = req.query.sort.split(',').join(' ');
-    query = query.sort(sortBy);
-  } else {
-    query = query.sort('-createdAt');
-  }
-
-  // Pagination
-  const page = parseInt(req.query.page, 10) || 1;
-  const limit = parseInt(req.query.limit, 10) || 10;
-  const startIndex = (page - 1) * limit;
-  const endIndex = page * limit;
-  const total = await Blog.countDocuments(query.getFilter());
-
-  query = query.skip(startIndex).limit(limit);
-
-  // Populate categories
-  query = query.populate('categories', 'name _id');
-
-  // Execute query
-  const results = await query;
-
-  // Pagination result
-  const pagination = {};
-  if (endIndex < total) {
-    pagination.next = {
-      page: page + 1,
-      limit
-    };
-  }
-
-  if (startIndex > 0) {
-    pagination.prev = {
-      page: page - 1,
-      limit
-    };
-  }
-
-  res.status(200).json({
-    success: true,
-    count: results.length,
-    pagination,
-    data: results
-  });
-
-  // // Pagination
-  // const page = parseInt(req.query.page, 10) || 1;
-  // const limit = parseInt(req.query.limit, 10) || 10;
-  // const startIndex = (page - 1) * limit;
-  // const endIndex = page * limit;
-  // const total = await Blog.countDocuments(JSON.parse(queryStr));
-
-  query = query.skip(startIndex).limit(limit);
-
-  // Executing query
-  const blogs = await query;
-
-  // Pagination result
-  // const pagination = {};
-
-  if (endIndex < total) {
-    pagination.next = {
-      page: page + 1,
-      limit
-    };
-  }
-
-  if (startIndex > 0) {
-    pagination.prev = {
-      page: page - 1,
-      limit
-    };
-  }
-
-  res.status(200).json({
-    success: true,
-    count: blogs.length,
-    pagination,
-    data: blogs
-  });
+  // The advancedResults middleware has already executed the query
+  // and attached the results to res.advancedResults
+  res.status(200).json(res.advancedResults);
 });
+
+// Apply published filter for non-admin users in a separate middleware
+const filterPublishedBlogs = (req, res, next) => {
+  if ((!req.user?.role || req.user.role !== 'admin') && !req.query.published) {
+    req.query.published = 'true';
+  }
+  next();
+};
 
 // @desc    Get single blog post by slug
 // @route   GET /api/v1/blog/slug/:slug
@@ -371,5 +251,6 @@ export {
   getBlogBySlug,
   createBlog,
   updateBlog,
-  deleteBlog
+  deleteBlog,
+  filterPublishedBlogs
 };

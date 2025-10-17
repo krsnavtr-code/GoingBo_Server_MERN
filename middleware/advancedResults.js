@@ -1,3 +1,5 @@
+import mongoose from 'mongoose';
+
 const advancedResults = (model, populate) => async (req, res, next) => {
   let query;
 
@@ -10,14 +12,29 @@ const advancedResults = (model, populate) => async (req, res, next) => {
   // Remove fields from reqQuery
   removeFields.forEach(param => delete reqQuery[param]);
 
+  // Handle category filter separately
+  if (reqQuery.category) {
+    // Convert category string to ObjectId
+    reqQuery.categories = reqQuery.category;
+    delete reqQuery.category;
+  }
+
   // Create query string
   let queryStr = JSON.stringify(reqQuery);
 
   // Create operators ($gt, $gte, etc)
   queryStr = queryStr.replace(/\b(gt|gte|lt|lte|in)\b/g, match => `$${match}`);
 
+  // Parse the query string to an object
+  const parsedQuery = JSON.parse(queryStr);
+
+  // Handle categories as an array of ObjectIds
+  if (parsedQuery.categories) {
+    parsedQuery.categories = { $in: [new mongoose.Types.ObjectId(parsedQuery.categories)] };
+  }
+
   // Start building the query
-  query = model.find(JSON.parse(queryStr));
+  query = model.find(parsedQuery);
 
   // Select fields
   if (req.query.select) {
