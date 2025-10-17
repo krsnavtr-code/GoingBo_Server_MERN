@@ -12,6 +12,7 @@ import publicRouter from './routes/public.routes.js';
 import mediaRouter from './routes/media.routes.js';
 import blogRoutes from './routes/blog.routes.js';
 import blogCategoryRoutes from './routes/blogCategory.routes.js';
+import itCategoryRoutes from './routes/itCategory.routes.js';
 import path from 'path';
 import fs from 'fs';
 
@@ -55,6 +56,7 @@ app.use(morgan('dev'));
 
 // Routes
 app.use('/api/v1/blog-categories', blogCategoryRoutes);
+app.use('/api/v1/it-categories', itCategoryRoutes);
 app.use('/api/v1/users', userRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/media', mediaRouter);
