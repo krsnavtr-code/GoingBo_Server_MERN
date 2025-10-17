@@ -11,12 +11,9 @@ const skillSchema = new mongoose.Schema(
       minlength: [2, 'A skill name must have more or equal than 2 characters']
     },
     category: {
-      type: String,
-      required: [true, 'A skill must belong to a category'],
-      enum: {
-        values: ['frontend', 'backend', 'database', 'devops', 'mobile', 'other'],
-        message: 'Category is either: frontend, backend, database, devops, mobile, or other'
-      }
+      type: mongoose.Schema.ObjectId,
+      ref: 'ITCategory',
+      required: [true, 'A skill must belong to a category']
     },
     level: {
       type: Number,

@@ -1,10 +1,16 @@
+import mongoose from 'mongoose';
 import Skill from '../models/skill.model.js';
 import AppError from '../utils/appError.js';
 import catchAsync from '../utils/catchAsync.js';
 
 // Get all skills (public access)
 export const getAllPublicSkills = catchAsync(async (req, res, next) => {
-  const skills = await Skill.find({ active: true }).select('-__v');
+  const skills = await Skill.find({ active: true })
+    .select('-__v')
+    .populate({
+      path: 'category',
+      select: 'name description icon'
+    });
 
   res.status(200).json({
     status: 'success',
@@ -16,7 +22,19 @@ export const getAllPublicSkills = catchAsync(async (req, res, next) => {
 });
 
 export const createSkill = catchAsync(async (req, res, next) => {
+  // Validate category exists
+  const category = await mongoose.model('ITCategory').findById(req.body.category);
+  if (!category) {
+    return next(new AppError('No category found with that ID', 400));
+  }
+
   const newSkill = await Skill.create(req.body);
+  
+  // Populate the category in the response
+  await newSkill.populate({
+    path: 'category',
+    select: 'name description icon'
+  });
 
   res.status(201).json({
     status: 'success',
@@ -27,7 +45,11 @@ export const createSkill = catchAsync(async (req, res, next) => {
 });
 
 export const getAllSkills = catchAsync(async (req, res, next) => {
-  const skills = await Skill.find({ active: true });
+  const skills = await Skill.find({ active: true })
+    .populate({
+      path: 'category',
+      select: 'name description icon'
+    });
 
   res.status(200).json({
     status: 'success',
@@ -39,7 +61,11 @@ export const getAllSkills = catchAsync(async (req, res, next) => {
 });
 
 export const getSkill = catchAsync(async (req, res, next) => {
-  const skill = await Skill.findById(req.params.id);
+  const skill = await Skill.findById(req.params.id)
+    .populate({
+      path: 'category',
+      select: 'name description icon'
+    });
 
   if (!skill) {
     return next(new AppError('No skill found with that ID', 404));
