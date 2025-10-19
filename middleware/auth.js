@@ -46,3 +46,7 @@ export const authorize = (...roles) => {
         next();
     };
 };
+
+// Alias for authorize to maintain compatibility with the project
+// This is the same as authorize but with a more descriptive name
+export const restrictTo = (...roles) => authorize(...roles);
