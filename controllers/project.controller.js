@@ -13,18 +13,13 @@ export const createProject = asyncHandler(async (req, res, next) => {
     
     console.log('Creating project with data:', JSON.stringify(projectData, null, 2));
     
-    // Process image URLs if provided
-    if (projectData.mainImage && !projectData.mainImage.startsWith('http')) {
-      projectData.mainImage = `${process.env.NEXT_PUBLIC_API_URL}${projectData.mainImage}`;
-    }
-
     // Process image gallery
     if (projectData.imageGallery && Array.isArray(projectData.imageGallery)) {
-      projectData.imageGallery = projectData.imageGallery.map(image => 
-        image && typeof image === 'string' && !image.startsWith('http') 
-          ? `${process.env.NEXT_PUBLIC_API_URL}${image}`
-          : image
-      ).filter(Boolean);
+      projectData.imageGallery = projectData.imageGallery.map(image => {
+        if (!image || typeof image !== 'string') return null;
+        if (image.startsWith('http')) return image;
+        return image.startsWith('/') ? image : `/${image}`;
+      }).filter(Boolean);
     }
 
     const project = await Project.create(projectData);
@@ -130,17 +125,17 @@ export const updateProject = asyncHandler(async (req, res, next) => {
   // Process image URLs if provided
   const projectData = { ...req.body };
   
-  // If mainImage is provided, prepend the base URL if it's a relative path
-  if (projectData.mainImage && !projectData.mainImage.startsWith('http')) {
-    projectData.mainImage = `${process.env.NEXT_PUBLIC_API_URL}${projectData.mainImage}`;
-  }
+  // // If mainImage is provided, prepend the base URL if it's a relative path
+  // if (projectData.mainImage && !projectData.mainImage.startsWith('http')) {
+  //   projectData.mainImage = `${projectData.mainImage}`;
+  // }
 
-  // Process image gallery
-  if (projectData.imageGallery && Array.isArray(projectData.imageGallery)) {
-    projectData.imageGallery = projectData.imageGallery.map(image => 
-      image.startsWith('http') ? image : `${process.env.NEXT_PUBLIC_API_URL}${image}`
-    );
-  }
+  // // Process image gallery
+  // if (projectData.imageGallery && Array.isArray(projectData.imageGallery)) {
+  //   projectData.imageGallery = projectData.imageGallery.map(image => 
+  //     image.startsWith('http') ? image : `${image}`
+  //   );
+  // }
 
   const project = await Project.findByIdAndUpdate(
     req.params.id,
