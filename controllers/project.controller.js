@@ -177,6 +177,30 @@ export const deleteProject = asyncHandler(async (req, res, next) => {
 // @desc    Get projects by category
 // @route   GET /api/projects/category/:categoryId
 // @access  Public
+// @desc    Get single project by slug
+// @route   GET /api/projects/slug/:slug
+// @access  Public
+export const getProjectBySlug = asyncHandler(async (req, res, next) => {
+  const project = await Project.findOne({ 
+    slug: req.params.slug,
+    isPublished: true 
+  }).populate('itcategories', 'name');
+
+  if (!project) {
+    return next(new ApiError('No published project found with that slug', 404));
+  }
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      project
+    }
+  });
+});
+
+// @desc    Get projects by category
+// @route   GET /api/projects/category/:categoryId
+// @access  Public
 export const getProjectsByCategory = asyncHandler(async (req, res, next) => {
   const projects = await Project.find({ 
     itcategories: req.params.categoryId,

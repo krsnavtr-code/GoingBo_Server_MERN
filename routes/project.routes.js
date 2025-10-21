@@ -8,6 +8,7 @@ const router = express.Router();
 // Public routes
 router.get('/', projectController.getProjects);
 router.get('/:id', projectController.getProject);
+router.get('/slug/:slug', projectController.getProjectBySlug);
 router.get('/category/:categoryId', projectController.getProjectsByCategory);
 
 // Protected routes (require authentication)
