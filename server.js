@@ -29,7 +29,11 @@ const PORT = process.env.PORT || 3000;
 
 
 // CORS Configuration
-const allowedOrigins = ['http://localhost:3000', 'http://127.0.0.1:3000'];
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://10.242.113.1:3000'
+];
 
 const corsOptions = {
   origin: function (origin, callback) {
@@ -134,7 +138,7 @@ const startServer = async () => {
     });
     console.log('✅ Connected to MongoDB');
 
-    const server = app.listen(PORT, () => {
+    const server = app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server is running at http://localhost:${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
     });
