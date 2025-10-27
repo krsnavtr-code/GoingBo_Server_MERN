@@ -16,6 +16,7 @@ import itCategoryRoutes from './routes/itCategory.routes.js';
 import path from 'path';
 import fs from 'fs';
 import projectRoutes from './routes/project.routes.js';
+import flightRoutes from './routes/flightRoutes.js';
 
 // Configure __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -68,8 +69,7 @@ app.use('/api/v1/media', mediaRouter);
 app.use('/api/v1/blog', blogRoutes);
 app.use('/api/v1', publicRouter);
 app.use('/api/v1/projects', projectRoutes);
-
-
+app.use('/api/v1/flights', flightRoutes);
 
 // Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, 'uploads');

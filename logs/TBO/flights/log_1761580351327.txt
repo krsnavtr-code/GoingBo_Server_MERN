@@ -1,0 +1,9 @@
+2025-10-27T15:52:31.333Z - Authentication Request: {"ClientId":"tboprod","UserName":"DELG738","Password":"Htl@DEL","EndUserIp":"127.0.0.1"}
+2025-10-27T15:52:31.931Z - Authentication Response: {"Status":4,"TokenId":null,"Error":{"ErrorCode":1,"ErrorMessage":"Incorrect Username or Password"}}
+2025-10-27T15:52:31.933Z - Authentication Error: Authentication failed
+Error: Authentication failed
+    at authenticate (file:///C:/Projects/Compuny/goingbo/server/utils/travelBoutiqueApi.js:120:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async testAuthentication (file:///C:/Projects/Compuny/goingbo/server/scripts/test-flight-api.js:29:24)
+    at async testSearchFlights (file:///C:/Projects/Compuny/goingbo/server/scripts/test-flight-api.js:43:9)
+    at async runTests (file:///C:/Projects/Compuny/goingbo/server/scripts/test-flight-api.js:111:31)

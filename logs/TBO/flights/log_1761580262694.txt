@@ -1,0 +1,16 @@
+2025-10-27T15:51:12.958Z - Authentication Request: {"ClientId":"tboprod","UserName":"DELG738","Password":"Htl@DEL","EndUserIp":"127.0.0.1"}
+2025-10-27T15:51:13.714Z - Authentication Response: {"Status":4,"TokenId":null,"Error":{"ErrorCode":1,"ErrorMessage":"Incorrect Username or Password"}}
+2025-10-27T15:51:13.715Z - Authentication Error: Authentication failed
+Error: Authentication failed
+    at authenticate (file:///C:/Projects/Compuny/goingbo/server/utils/travelBoutiqueApi.js:120:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async makeRequest (file:///C:/Projects/Compuny/goingbo/server/utils/travelBoutiqueApi.js:134:7)
+    at async searchFlights (file:///C:/Projects/Compuny/goingbo/server/utils/travelBoutiqueApi.js:219:20)
+    at async searchFlightsCtrl (file:///C:/Projects/Compuny/goingbo/server/controllers/flightController.js:33:21)
+2025-10-27T15:51:13.716Z - API Request Error (Search): Authentication failed
+Error: Authentication failed
+    at authenticate (file:///C:/Projects/Compuny/goingbo/server/utils/travelBoutiqueApi.js:120:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async makeRequest (file:///C:/Projects/Compuny/goingbo/server/utils/travelBoutiqueApi.js:134:7)
+    at async searchFlights (file:///C:/Projects/Compuny/goingbo/server/utils/travelBoutiqueApi.js:219:20)
+    at async searchFlightsCtrl (file:///C:/Projects/Compuny/goingbo/server/controllers/flightController.js:33:21)
