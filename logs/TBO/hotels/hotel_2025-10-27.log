@@ -1,0 +1,62 @@
+[2025-10-27T19:46:33.678Z] [INFO] Request: https://affiliate.travelboutiqueonline.com/HotelAPI/Search
+{
+  "CheckIn": "2025-10-27",
+  "CheckOut": "2025-10-28",
+  "CityId": "Moradabad ",
+  "CountryCode": "IN",
+  "GuestNationality": "IN",
+  "PaxRooms": [
+    {
+      "Adults": 2,
+      "Children": 0,
+      "ChildrenAges": []
+    }
+  ],
+  "ResponseTime": 23,
+  "IsDetailedResponse": true,
+  "HotelCodes": [],
+  "Filters": {
+    "Refundable": false,
+    "NoOfRooms": 1,
+    "MealType": 0,
+    "OrderBy": 0,
+    "StarRating": 0
+  }
+}
+[2025-10-27T19:46:34.316Z] [INFO] Response (200): {
+  "Status": {
+    "Code": 400,
+    "Description": "Invalid Request"
+  }
+}
+[2025-10-27T19:47:18.291Z] [INFO] Request: https://affiliate.travelboutiqueonline.com/HotelAPI/Search
+{
+  "CheckIn": "2025-10-27",
+  "CheckOut": "2025-10-28",
+  "CityId": "delhi",
+  "CountryCode": "IN",
+  "GuestNationality": "IN",
+  "PaxRooms": [
+    {
+      "Adults": 2,
+      "Children": 0,
+      "ChildrenAges": []
+    }
+  ],
+  "ResponseTime": 23,
+  "IsDetailedResponse": true,
+  "HotelCodes": [],
+  "Filters": {
+    "Refundable": false,
+    "NoOfRooms": 1,
+    "MealType": 0,
+    "OrderBy": 0,
+    "StarRating": 0
+  }
+}
+[2025-10-27T19:47:18.892Z] [INFO] Response (200): {
+  "Status": {
+    "Code": 400,
+    "Description": "Invalid Request"
+  }
+}
