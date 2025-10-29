@@ -19,25 +19,9 @@ const projectSchema = new mongoose.Schema(
       trim: true,
       maxlength: [250, 'Short description cannot be longer than 250 characters']
     },
-    technologies: [{
-      type: String,
-      trim: true
-    }],
-    // projectUrl: {
-    //   type: String,
-    //   trim: true
-    // },
-    // githubUrl: {
-    //   type: String,
-    //   trim: true
-    // },
-    // githubUrl2: {
-    //   type: String,
-    //   trim: true
-    // },
     status: {
       type: String,
-      enum: ['planning', 'in_progress', 'completed', 'on_hold', 'cancelled'],
+      enum: ['planning', 'in_progress', 'completed', 'on_hold'],
       default: 'planning'
     },
     priority: {
@@ -78,11 +62,11 @@ const projectSchema = new mongoose.Schema(
       type: String,
       trim: true
     }],
+    // Package Categories as itcategories
     itcategories: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'ITCategory'
     }],
-    // Travel Package Fields
     packageType: {
       type: String,
       enum: ['project', 'travel'],
@@ -92,7 +76,12 @@ const projectSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
-    duration: {
+    duration: {  // Duration Night
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    durationDay: {
       type: Number,
       min: 0,
       default: 0
@@ -108,16 +97,105 @@ const projectSchema = new mongoose.Schema(
       max: 100,
       default: 0
     },
+    // Location details
+    location: {
+      country: {
+        type: String,
+        trim: true
+      },
+      state: {
+        type: String,
+        trim: true
+      },
+      city: {
+        type: String,
+        trim: true
+      },
+      address: {
+        type: String,
+        trim: true
+      },
+    },
+    // Highlights of the package
+    highlights: [{
+      type: String,
+      trim: true
+    }],
+    // Ratings and reviews
+    ratings: {
+      average: {
+        type: Number,
+        min: 1,
+        max: 5,
+        default: 0
+      },
+      count: {
+        type: Number,
+        default: 0
+      },
+      reviews: [{
+        user: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+          required: true
+        },
+        rating: {
+          type: Number,
+          required: true,
+          min: 1,
+          max: 5
+        },
+        comment: {
+          type: String,
+          trim: true
+        },
+        createdAt: {
+          type: Date,
+          default: Date.now
+        }
+      }]
+    },
+    // Frequently Asked Questions
+    faqs: [{
+      question: {
+        type: String,
+        required: true,
+        trim: true
+      },
+      answer: {
+        type: String,
+        required: true,
+        trim: true
+      },
+      isActive: {
+        type: Boolean,
+        default: true
+      }
+    }],
+    availableSeats: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    // SEO Meta Fields
+    metaTitle: {
+      type: String,
+      trim: true,
+      maxlength: 100
+    },
+    metaDescription: {
+      type: String,
+      trim: true,
+      maxlength: 160
+    },
+    metaKeywords: [{
+      type: String,
+      trim: true
+    }],
     maxTravelers: {
       type: Number,
       min: 1,
       default: 1
-    },
-    departureDate: {
-      type: Date
-    },
-    returnDate: {
-      type: Date
     },
     included: [{
       type: String,
@@ -134,6 +212,10 @@ const projectSchema = new mongoose.Schema(
         required: true
       },
       location: {
+        type: String,
+        trim: true
+      },
+      locationMapLink: {
         type: String,
         trim: true
       },

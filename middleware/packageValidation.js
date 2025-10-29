@@ -30,29 +30,8 @@ export const validateProjectInput = (data, isUpdate = false) => {
       .messages({
         'string.max': 'Short description cannot be longer than 250 characters'
       }),
-    technologies: Joi.array()
-      .items(Joi.string())
-      .default([]),
-    // projectUrl: Joi.string()
-    //   .uri()
-    //   .allow('')
-    //   .messages({
-    //     'string.uri': 'Project URL must be a valid URL'
-    //   }),
-    // githubUrl: Joi.string()
-    //   .uri()
-    //   .allow('')
-    //   .messages({
-    //     'string.uri': 'GitHub URL must be a valid URL'
-    //   }),
-    // githubUrl2: Joi.string()
-    //   .uri()
-    //   .allow('')
-    //   .messages({
-    //     'string.uri': 'Second GitHub URL must be a valid URL'
-    //   }),
     status: Joi.string()
-      .valid('planning', 'in_progress', 'completed', 'on_hold', 'cancelled')
+      .valid('planning', 'in_progress', 'completed', 'on_hold')
       .default('planning'),
     priority: Joi.number()
       .integer()
@@ -99,20 +78,17 @@ export const validateProjectInput = (data, isUpdate = false) => {
       .default('project'),
     destination: Joi.string().allow(''),
     duration: Joi.number().min(0).default(0),
+    durationDay: Joi.number().min(0).default(0),
     price: Joi.number().min(0).default(0),
     discount: Joi.number().min(0).max(100).default(0),
     maxTravelers: Joi.number().min(1).default(1),
-    departureDate: Joi.date().allow(null, ''),
-    returnDate: Joi.date().min(Joi.ref('departureDate')).allow(null, '')
-      .messages({
-        'date.min': 'Return date must be after departure date'
-      }),
     included: Joi.array().items(Joi.string().trim()).default([]),
     excluded: Joi.array().items(Joi.string().trim()).default([]),
     itinerary: Joi.array().items(
       Joi.object({
         title: Joi.string().trim().required(),
         location: Joi.string().trim().allow(''),
+        locationMapLink: Joi.string().trim().allow(''),
         description: Joi.string().trim().allow(''),
         meals: Joi.array().items(
           Joi.string().valid('breakfast', 'lunch', 'dinner')
@@ -122,6 +98,50 @@ export const validateProjectInput = (data, isUpdate = false) => {
     accommodation: Joi.string().allow(''),
     transportation: Joi.string().allow(''),
     mealPlan: Joi.string().allow(''),
+    
+    // Location details
+    location: Joi.object({
+      country: Joi.string().trim().allow(''),
+      state: Joi.string().trim().allow(''),
+      city: Joi.string().trim().allow(''),
+      address: Joi.string().trim().allow(''),
+    }).optional(),
+    
+    // Highlights
+    highlights: Joi.array()
+      .items(Joi.string().trim())
+      .default([]),
+      
+    // Ratings and reviews
+    ratings: Joi.object({
+      average: Joi.number().min(1).max(5).default(0),
+      count: Joi.number().min(0).default(0),
+      reviews: Joi.array().items(
+        Joi.object({
+          user: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).required(),
+          rating: Joi.number().min(1).max(5).required(),
+          comment: Joi.string().trim().allow(''),
+          createdAt: Joi.date().default(Date.now)
+        })
+      ).default([])
+    }).default({ average: 0, count: 0, reviews: [] }),
+    
+    // FAQs
+    faqs: Joi.array().items(
+      Joi.object({
+        question: Joi.string().trim().required(),
+        answer: Joi.string().trim().required(),
+        isActive: Joi.boolean().default(true)
+      })
+    ).default([]),
+    
+    // Available seats
+    availableSeats: Joi.number().min(0).default(0),
+    
+    // SEO Meta Fields
+    metaTitle: Joi.string().trim().max(100).allow(''),
+    metaDescription: Joi.string().trim().max(160).allow(''),
+    metaKeywords: Joi.array().items(Joi.string().trim()).default([]),
     cancellationPolicy: Joi.string().allow(''),
     bookingDeadline: Joi.date().allow(null, ''),
     minTravelersRequired: Joi.number().min(1).default(1),

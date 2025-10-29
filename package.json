@@ -2,17 +2,17 @@
   "name": "server",
   "version": "1.0.0",
   "type": "module",
-  "description": "A Portfolio Backend",
-  "homepage": "https://github.com/krsnavtr-code/t-k-p-Server#readme",
+  "description": "GoingBo Backend",
+  "homepage": "https://github.com/krsnavtr-code/goingbo#readme",
   "bugs": {
-    "url": "https://github.com/krsnavtr-code/t-k-p-Server/issues"
+    "url": "https://github.com/krsnavtr-code/goingbo/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/krsnavtr-code/t-k-p-Server.git"
+    "url": "git+https://github.com/krsnavtr-code/goingbo.git"
   },
   "license": "ISC",
-  "author": "Krishna Avtar By TRIVIXA",
+  "author": "GoingBo",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
