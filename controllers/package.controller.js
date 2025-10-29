@@ -1,7 +1,7 @@
-import Project from '../models/project.model.js';
+import Project from '../models/package.model.js';
 import asyncHandler from 'express-async-handler';
 import ApiError from '../utils/ApiError.js';
-import { validateProjectInput } from '../middleware/projectValidation.js';
+import { validateProjectInput } from '../middleware/packageValidation.js';
 
 // @desc    Create a new project
 // @route   POST /api/projects

@@ -1,7 +1,7 @@
 import express from 'express';
-import * as projectController from '../controllers/project.controller.js';
+import * as projectController from '../controllers/package.controller.js';
 import { protect, restrictTo } from '../middleware/auth.js';
-import { validateProject, projectExists } from '../middleware/projectValidation.js';
+import { validateProject, projectExists } from '../middleware/packageValidation.js';
 
 const router = express.Router();
 

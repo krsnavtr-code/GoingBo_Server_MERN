@@ -23,18 +23,18 @@ const projectSchema = new mongoose.Schema(
       type: String,
       trim: true
     }],
-    projectUrl: {
-      type: String,
-      trim: true
-    },
-    githubUrl: {
-      type: String,
-      trim: true
-    },
-    githubUrl2: {
-      type: String,
-      trim: true
-    },
+    // projectUrl: {
+    //   type: String,
+    //   trim: true
+    // },
+    // githubUrl: {
+    //   type: String,
+    //   trim: true
+    // },
+    // githubUrl2: {
+    //   type: String,
+    //   trim: true
+    // },
     status: {
       type: String,
       enum: ['planning', 'in_progress', 'completed', 'on_hold', 'cancelled'],
@@ -81,7 +81,119 @@ const projectSchema = new mongoose.Schema(
     itcategories: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'ITCategory'
-    }]
+    }],
+    // Travel Package Fields
+    packageType: {
+      type: String,
+      enum: ['project', 'travel'],
+      default: 'project'
+    },
+    destination: {
+      type: String,
+      trim: true
+    },
+    duration: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    price: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    discount: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 0
+    },
+    maxTravelers: {
+      type: Number,
+      min: 1,
+      default: 1
+    },
+    departureDate: {
+      type: Date
+    },
+    returnDate: {
+      type: Date
+    },
+    included: [{
+      type: String,
+      trim: true
+    }],
+    excluded: [{
+      type: String,
+      trim: true
+    }],
+    itinerary: [{
+      title: {
+        type: String,
+        trim: true,
+        required: true
+      },
+      location: {
+        type: String,
+        trim: true
+      },
+      description: {
+        type: String,
+        trim: true
+      },
+      meals: [{
+        type: String,
+        enum: ['breakfast', 'lunch', 'dinner']
+      }]
+    }],
+    accommodation: {
+      type: String,
+      trim: true
+    },
+    transportation: {
+      type: String,
+      trim: true
+    },
+    mealPlan: {
+      type: String,
+      trim: true
+    },
+    cancellationPolicy: {
+      type: String,
+      trim: true
+    },
+    bookingDeadline: {
+      type: Date
+    },
+    minTravelersRequired: {
+      type: Number,
+      min: 1,
+      default: 1
+    },
+    isFeatured: {
+      type: Boolean,
+      default: false
+    },
+    isGroupDiscountAvailable: {
+      type: Boolean,
+      default: false
+    },
+    groupDiscountDetails: {
+      type: String,
+      trim: true
+    },
+    ageRestrictions: {
+      type: String,
+      trim: true
+    },
+    physicalRating: {
+      type: String,
+      trim: true
+    },
+    specialRequirements: {
+      type: String,
+      trim: true
+    }
   },
   {
     timestamps: true,

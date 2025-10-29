@@ -15,7 +15,7 @@ import blogCategoryRoutes from './routes/blogCategory.routes.js';
 import itCategoryRoutes from './routes/itCategory.routes.js';
 import path from 'path';
 import fs from 'fs';
-import projectRoutes from './routes/project.routes.js';
+import projectRoutes from './routes/package.routes.js';
 import flightRoutes from './routes/flightRoutes.js';
 import hotelRoutes from './routes/hotelRoutes.js';
 
@@ -69,7 +69,7 @@ app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/media', mediaRouter);
 app.use('/api/v1/blog', blogRoutes);
 app.use('/api/v1', publicRouter);
-app.use('/api/v1/projects', projectRoutes);
+app.use('/api/v1/packages', projectRoutes);
 app.use('/api/v1/flights', flightRoutes);
 app.use('/api/v1/hotels', hotelRoutes);
 
