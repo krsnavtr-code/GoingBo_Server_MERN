@@ -36,14 +36,19 @@ export const createProject = asyncHandler(async (req, res, next) => {
   }
 });
 
-// @desc    Get all projects
-// @route   GET /api/projects
+// @desc    Get all packages
+// @route   GET /api/v1/packages
 // @access  Public
 export const getProjects = asyncHandler(async (req, res) => {
   // Build query
   const queryObj = { ...req.query };
   const excludedFields = ['page', 'sort', 'limit', 'fields'];
   excludedFields.forEach(el => delete queryObj[el]);
+
+  // Convert isPublished to boolean if it exists
+  if (queryObj.isPublished) {
+    queryObj.isPublished = queryObj.isPublished === 'true';
+  }
 
   // Filtering
   let queryStr = JSON.stringify(queryObj);
@@ -218,6 +223,51 @@ export const getProjectsByCategory = asyncHandler(async (req, res, next) => {
 
 // @desc    Toggle project publish status
 // @route   PATCH /api/projects/:id/toggle-publish
+// @access  Private/Admin
+// @desc    Duplicate a package
+// @route   POST /api/v1/packages/:id/duplicate
+// @access  Private/Admin
+export const duplicateProject = asyncHandler(async (req, res, next) => {
+  try {
+    // 1) Get the original package
+    const originalProject = await Project.findById(req.params.id);
+    
+    if (!originalProject) {
+      return next(new ApiError('No package found with that ID', 404));
+    }
+
+    // 2) Create a copy of the original package data
+    let projectData = originalProject.toObject();
+    
+    // 3) Remove _id, __v, and timestamps from the copy
+    const { _id, __v, createdAt, updatedAt, ...rest } = projectData;
+    projectData = { ...rest };
+
+    // 4) Modify title and slug to indicate it's a copy
+    projectData.title = `Copy of ${projectData.title}`.substring(0, 100);
+    projectData.slug = `${projectData.slug}-copy-${Date.now()}`.substring(0, 100);
+    
+    // 5) Set default status and published status
+    projectData.status = 'planning';
+    projectData.isPublished = false;
+    
+    // 6) Create the new package
+    const newProject = await Project.create(projectData);
+
+    res.status(201).json({
+      status: 'success',
+      data: {
+        package: newProject
+      }
+    });
+  } catch (error) {
+    console.error('Error duplicating package:', error);
+    next(error);
+  }
+});
+
+// @desc    Toggle publish status of a package
+// @route   PATCH /api/v1/packages/:id/toggle-publish
 // @access  Private/Admin
 export const togglePublishProject = asyncHandler(async (req, res, next) => {
   const project = await Project.findById(req.params.id);

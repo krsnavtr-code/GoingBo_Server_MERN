@@ -21,5 +21,6 @@ router.post('/', validateProject, projectController.createProject);
 router.patch('/:id', projectExists, validateProject, projectController.updateProject);
 router.delete('/:id', projectExists, projectController.deleteProject);
 router.patch('/:id/toggle-publish', projectExists, projectController.togglePublishProject);
+router.post('/:id/duplicate', projectExists, projectController.duplicateProject);
 
 export default router;
