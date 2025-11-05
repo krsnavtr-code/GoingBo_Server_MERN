@@ -34,49 +34,20 @@ const PORT = process.env.PORT || 3000;
 
 // CORS Configuration
 const allowedOrigins = [
+  'http://82.112.236.83:3000',
   'http://localhost:3000',
   'http://127.0.0.1:3000',
   'http://10.54.246.1:3000',
 ];
 
-// const corsOptions = {
-//   origin: function (origin, callback) {
-//     if (!origin || allowedOrigins.includes(origin)) {
-//       callback(null, true);
-//     } else {
-//       callback(new Error('Not allowed by CORS'));
-//     }
-//   },
-//   credentials: true,
-//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-//   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-//   exposedHeaders: ['Set-Cookie'],
-//   optionsSuccessStatus: 200
-// };
-
-// const corsOptions = {
-//   origin: function (origin, callback) {
-//     // Allow requests with no origin (e.g. mobile apps, curl)
-//     if (!origin) return callback(null, true);
-
-//     // Allow localhost, 127.*, and any 192.* LAN IP automatically
-//     const allowedPatterns = [/localhost/, /127\.0\.0\.1/, /192\.168\./, /10\./];
-
-//     if (allowedPatterns.some((pattern) => pattern.test(origin))) {
-//       callback(null, true);
-//     } else {
-//       callback(new Error(`Not allowed by CORS: ${origin}`));
-//     }
-//   },
-//   credentials: true,
-//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-//   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-//   exposedHeaders: ['Set-Cookie'],
-//   optionsSuccessStatus: 200
-// };
-
 const corsOptions = {
-  origin: true, // Allow all origins in development
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
