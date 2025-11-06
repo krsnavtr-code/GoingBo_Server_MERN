@@ -36,15 +36,15 @@ const PORT = process.env.PORT || 3000;
 const allowedOrigins = [
   'http://82.112.236.83:3000',
   'http://localhost:3000',
-  'http://127.0.0.1:3000',
-  'http://10.54.246.1:3000',
 ];
 
 const corsOptions = {
   origin: function (origin, callback) {
+    console.log('Request origin:', origin); // Add this line
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      console.log('Blocked origin:', origin); // And this line
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -145,8 +145,8 @@ const startServer = async () => {
     });
     console.log('✅ Connected to MongoDB');
 
-    const server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 Server is running at http://10.54.246.1:${PORT}`);
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running on port ${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
     });
 
