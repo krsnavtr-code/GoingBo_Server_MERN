@@ -34,7 +34,7 @@ const PORT = process.env.PORT || 3000;
 
 // CORS Configuration
 const allowedOrigins = [
-  'http://82.112.236.83:3000',
+  'http://82.112.236.83',
   'http://localhost:3000',
 ];
 
