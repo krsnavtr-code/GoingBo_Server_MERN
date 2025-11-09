@@ -6,11 +6,14 @@ import User from '../models/user.model.js';
 export const protect = asyncHandler(async (req, res, next) => {
     let token;
 
-    // 1. Get token from cookies
-    token = req.cookies.jwt;
-
-    console.log('Cookies:', req.cookies); // Debug log
-    console.log('Token from cookie:', token); // Debug log
+    // 1. Get token from header or cookies
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        // Get token from header
+        token = req.headers.authorization.split(' ')[1];
+    } else if (req.cookies.jwt) {
+        // Get token from cookie
+        token = req.cookies.jwt;
+    }
 
     if (!token) {
         return next(new Error('Not authorized, no token'));
@@ -19,11 +22,9 @@ export const protect = asyncHandler(async (req, res, next) => {
     try {
         // 2. Verify token
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        console.log('Decoded token:', decoded); // Debug log
 
         // 3. Get user from the token
         req.user = await User.findById(decoded.id).select('-password');
-        console.log('User from token:', req.user); // Debug log
 
         if (!req.user) {
             return next(new Error('User not found'));

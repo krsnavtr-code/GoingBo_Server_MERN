@@ -79,14 +79,47 @@ app.use('/api/v1/faqs', faqsRoutes);
 app.use('/api/v1/admin', dynamicFieldRoutes);
 
 // Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, 'uploads');
+const uploadsDir = path.resolve(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
+  console.log(`Created uploads directory at: ${uploadsDir}`);
+} else {
+  console.log(`Uploads directory exists at: ${uploadsDir}`);
 }
 
+// Log the contents of the uploads directory
+fs.readdir(uploadsDir, (err, files) => {
+  if (err) {
+    console.error('Error reading uploads directory:', err);
+    return;
+  }
+  console.log('Files in uploads directory:', files);
+});
 
-// Serve static files from uploads directory
-app.use('/uploads', express.static(uploadsDir));
+// Serve static files from uploads directory with proper caching
+app.use('/uploads', express.static(uploadsDir, {
+  etag: true,
+  lastModified: true,
+  setHeaders: (res, path) => {
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+  }
+}));
+
+// Debug route to check file access
+app.get('/check-upload/:filename', (req, res) => {
+  const filePath = path.join(uploadsDir, req.params.filename);
+  res.sendFile(filePath, (err) => {
+    if (err) {
+      console.error('Error serving file:', err);
+      res.status(404).json({
+        status: 'error',
+        message: 'File not found',
+        path: filePath,
+        exists: fs.existsSync(filePath)
+      });
+    }
+  });
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {

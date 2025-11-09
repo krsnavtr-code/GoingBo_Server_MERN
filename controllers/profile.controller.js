@@ -8,9 +8,15 @@ export const getProfile = catchAsync(async (req, res, next) => {
   
   const profile = await Profile.findOne();
   
+  if (!profile) {
+    return next(new AppError('Profile not found', 404));
+  }
+  
   res.status(200).json({
-    success: true,
-    data: profile
+    status: 'success',
+    data: {
+      profile
+    }
   });
 });
 
