@@ -21,13 +21,23 @@ const createSendToken = (user, statusCode, res) => {
   const expirationDate = new Date();
   expirationDate.setDate(expirationDate.getDate() + expiresInDays);
 
+  const isProduction = process.env.NODE_ENV === 'production';
+  const domain = isProduction ? process.env.DOMAIN : undefined;
+
   const cookieOptions = {
     expires: expirationDate,
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    secure: isProduction, // Only use secure in production
+    sameSite: isProduction ? 'none' : 'lax', // Use 'none' in production, 'lax' in development
     path: '/',
+    domain: domain,
   };
+
+  // For cross-site cookies in production, we need to set secure and sameSite: 'none'
+  if (isProduction) {
+    cookieOptions.secure = true;
+    cookieOptions.sameSite = 'none';
+  }
 
   // Remove password from output
   user.password = undefined;
