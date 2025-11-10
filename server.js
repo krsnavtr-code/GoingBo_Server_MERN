@@ -20,6 +20,7 @@ import flightRoutes from './routes/flightRoutes.js';
 import hotelRoutes from './routes/hotelRoutes.js';
 import faqsRoutes from './routes/faqs.routes.js';
 import dynamicFieldRoutes from './routes/dynamicField.routes.js';
+import cabRoutes from './routes/cab.routes.js';
 
 // Configure __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -103,6 +104,7 @@ app.use('/api/v1/flights', flightRoutes);
 app.use('/api/v1/hotels', hotelRoutes);
 app.use('/api/v1/faqs', faqsRoutes);
 app.use('/api/v1/admin', dynamicFieldRoutes);
+app.use('/api/v1/admin/cabs', cabRoutes);
 
 // Ensure uploads directory exists
 const uploadsDir = path.resolve(__dirname, 'uploads');
