@@ -40,25 +40,26 @@ const createSendToken = (user, statusCode, res) => {
   const cookieOptions = {
     expires: expirationDate,
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production', // true in production with HTTPS
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    domain: process.env.NODE_ENV === 'production' ? '82.112.236.83' : 'localhost',
+    secure: false, // Set to false for HTTP
+    sameSite: 'lax', // Use 'lax' for HTTP, 'none' for HTTPS
     path: '/',
+    // Don't set domain for IP addresses
   };
 
   // Remove password from output
   user.password = undefined;
 
-  // Send token in cookie
+  // Set cookie in response
   res.cookie('jwt', token, cookieOptions);
+  
+  // For debugging
+  console.log('Setting JWT cookie with options:', JSON.stringify(cookieOptions, null, 2));
 
-  // Also send token in response body for clients that can't use cookies
+  // Send response with user data
   res.status(statusCode).json({
     status: 'success',
-    token, // This is for clients that want to handle the token manually
-    data: {
-      user,
-    },
+    token, // For clients that want to handle the token manually
+    data: { user }
   });
 };
 
@@ -211,33 +212,30 @@ export const resetPassword = catchAsync(async (req, res, next) => {
 });
 
 export const protect = catchAsync(async (req, res, next) => {
-  // 1) Getting token and check of it's there
+  // 1) Get token from header or cookies
   let token;
-
-  // Check for token in Authorization header
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     token = req.headers.authorization.split(' ')[1];
-  }
-  // Check for token in cookies
-  else if (req.cookies?.jwt) {
+  } else if (req.cookies?.jwt) {
     token = req.cookies.jwt;
   }
 
   if (!token) {
-    return next(
-      new AppError('You are not logged in! Please log in to get access.', 401)
-    );
+    return next(new AppError('You are not logged in! Please log in to get access.', 401));
   }
 
-  // 2) Verification token
+  // 2) Verify token
   const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
 
   // 3) Check if user still exists
   const currentUser = await User.findById(decoded.id);
   if (!currentUser) {
-    return next(
-      new AppError('The user belonging to this token no longer exists.', 401)
-    );
+    return next(new AppError('The user belonging to this token no longer exists.', 401));
+  }
+
+  // 4) Check if user changed password after the token was issued
+  if (currentUser.changedPasswordAfter(decoded.iat)) {
+    return next(new AppError('User recently changed password! Please log in again.', 401));
   }
 
   // GRANT ACCESS TO PROTECTED ROUTE

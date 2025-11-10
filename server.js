@@ -45,17 +45,25 @@ const corsOptions = {
       return callback(null, true);
     }
     
-    // In production, only allow specific origins
-    if (!origin || allowedOrigins.some(allowedOrigin => 
+    // In production, allow requests with or without origin (like Postman)
+    if (!origin) {
+      return callback(null, true);
+    }
+    
+    // Check against allowed origins
+    const allowed = allowedOrigins.some(allowedOrigin => 
       origin === allowedOrigin || 
+      origin.includes(allowedOrigin) ||
       origin.startsWith(`http://${allowedOrigin}`) || 
       origin.startsWith(`https://${allowedOrigin}`)
-    )) {
+    );
+    
+    if (allowed) {
       return callback(null, true);
     }
     
     console.log('Blocked origin:', origin);
-    callback(new Error('Not allowed by CORS'));
+    return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -64,18 +72,13 @@ const corsOptions = {
     'Authorization', 
     'X-Requested-With',
     'Accept',
-    'X-XSRF-TOKEN',
-    'X-Forwarded-For',
-    'X-Forwarded-Proto',
-    'X-Forwarded-Port'
+    'X-XSRF-TOKEN'
   ],
   exposedHeaders: [
     'Set-Cookie',
-    'Authorization',
-    'X-XSRF-TOKEN'
+    'Authorization'
   ],
-  optionsSuccessStatus: 200,
-  preflightContinue: false
+  optionsSuccessStatus: 200
 };
 
 // Enable CORS with the specified options
