@@ -47,6 +47,7 @@ const userSchema = new mongoose.Schema({
   passwordResetOTP: String,
   passwordResetToken: String,
   passwordResetExpires: Date,
+  passwordChangedAt: Date,
   createdAt: {
     type: Date,
     default: Date.now,
@@ -55,15 +56,35 @@ const userSchema = new mongoose.Schema({
 
 // Hash password before saving
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
-
+  if (!this.isModified('password') || this.isNew) return next();
+  
   this.password = await bcrypt.hash(this.password, 12);
+  next();
+});
+
+// Set passwordChangedAt when password is modified
+userSchema.pre('save', function(next) {
+  if (!this.isModified('password') || this.isNew) return next();
+  this.passwordChangedAt = Date.now() - 1000; // Ensure token is created after password change
   next();
 });
 
 // Method to check password
 userSchema.methods.correctPassword = async function (candidatePassword, userPassword) {
   return await bcrypt.compare(candidatePassword, userPassword);
+};
+
+// Check if password was changed after JWT was issued
+userSchema.methods.changedPasswordAfter = function(JWTTimestamp) {
+  if (this.passwordChangedAt) {
+    const changedTimestamp = parseInt(
+      this.passwordChangedAt.getTime() / 1000,
+      10
+    );
+    return JWTTimestamp < changedTimestamp;
+  }
+  // False means NOT changed
+  return false;
 };
 
 // Add to user.model.js
