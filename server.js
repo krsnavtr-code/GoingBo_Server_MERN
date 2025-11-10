@@ -40,19 +40,42 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: function (origin, callback) {
-    console.log('Request origin:', origin); // Add this line
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.log('Blocked origin:', origin); // And this line
-      callback(new Error('Not allowed by CORS'));
+    // In development, allow all origins
+    if (process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
     }
+    
+    // In production, only allow specific origins
+    if (!origin || allowedOrigins.some(allowedOrigin => 
+      origin === allowedOrigin || 
+      origin.startsWith(`http://${allowedOrigin}`) || 
+      origin.startsWith(`https://${allowedOrigin}`)
+    )) {
+      return callback(null, true);
+    }
+    
+    console.log('Blocked origin:', origin);
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['Set-Cookie'],
-  optionsSuccessStatus: 200
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With',
+    'Accept',
+    'X-XSRF-TOKEN',
+    'X-Forwarded-For',
+    'X-Forwarded-Proto',
+    'X-Forwarded-Port'
+  ],
+  exposedHeaders: [
+    'Set-Cookie',
+    'Authorization',
+    'X-XSRF-TOKEN'
+  ],
+  optionsSuccessStatus: 200,
+  preflightContinue: false
 };
 
 // Enable CORS with the specified options

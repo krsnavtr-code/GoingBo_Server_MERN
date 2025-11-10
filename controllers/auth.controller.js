@@ -28,14 +28,22 @@ const createSendToken = (user, statusCode, res) => {
   //   sameSite: 'strict',
   //   path: '/',
   // };
+  // const cookieOptions = {
+  //   expires: expirationDate,
+  //   httpOnly: true,
+  //   secure: process.env.NODE_ENV === 'production', // true in production
+  //   sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Important for cross-site cookies
+  //   domain: process.env.NODE_ENV === 'production' ? '.yourdomain.com' : 'localhost', // Replace with your domain
+  //   path: '/',
+  //   secureProxy: process.env.NODE_ENV === 'production'
+  // };
   const cookieOptions = {
     expires: expirationDate,
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production', // true in production
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Important for cross-site cookies
-    domain: process.env.NODE_ENV === 'production' ? '.yourdomain.com' : 'localhost', // Replace with your domain
+    secure: process.env.NODE_ENV === 'production', // true in production with HTTPS
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    domain: process.env.NODE_ENV === 'production' ? '82.112.236.83' : 'localhost',
     path: '/',
-    secureProxy: process.env.NODE_ENV === 'production'
   };
 
   // Remove password from output
