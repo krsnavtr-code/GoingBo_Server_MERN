@@ -21,12 +21,21 @@ const createSendToken = (user, statusCode, res) => {
   const expirationDate = new Date();
   expirationDate.setDate(expirationDate.getDate() + expiresInDays);
 
+  // const cookieOptions = {
+  //   expires: expirationDate,
+  //   httpOnly: true,
+  //   secure: process.env.NODE_ENV === 'production',
+  //   sameSite: 'strict',
+  //   path: '/',
+  // };
   const cookieOptions = {
     expires: expirationDate,
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    secure: process.env.NODE_ENV === 'production', // true in production
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Important for cross-site cookies
+    domain: process.env.NODE_ENV === 'production' ? '.yourdomain.com' : 'localhost', // Replace with your domain
     path: '/',
+    secureProxy: process.env.NODE_ENV === 'production'
   };
 
   // Remove password from output
