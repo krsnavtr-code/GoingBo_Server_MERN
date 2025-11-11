@@ -6,6 +6,7 @@ import {
     getBookingDetails,
     getHotelCodeList
 } from '../utils/travelBoutiqueHotelApi.js';
+import Hotel from '../models/Hotel.js';
 
 // Search hotels
 export const search = async (req, res) => {
