@@ -33,7 +33,18 @@ transporter.verify((error, success) => {
 
 // Email templates
 const templates = {
-    
+    passwordReset: (data) => `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+      <h2 style="color: #4a5568;">Password Reset Request</h2>
+      <p>Hello ${data.name},</p>
+      <p>We received a request to reset your password. Please use the following OTP to proceed:</p>
+      <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 2px;">
+        ${data.otp}
+      </div>
+      <p>This OTP is valid for 10 minutes. If you didn't request this, please ignore this email or contact support if you have any concerns.</p>
+      <p>Best regards,<br>${process.env.EMAIL_FROM_NAME || 'Your App Team'}</p>
+    </div>
+  `,
     contactUser: (data) => `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
       <h2 style="color: #4a5568;">Thank You for Contacting Us</h2>

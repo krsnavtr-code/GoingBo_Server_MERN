@@ -20,12 +20,14 @@ import {
   updateCabSettings,
   createCabBooking,
   getMyBookings,
+  registerCab,
 } from '../controllers/cab.controller.js';
 
 const router = express.Router();
 
-// Public route for finding available cabs
+// Public routes
 router.get('/available', findAvailableCabs);
+router.post('/register', registerCab);
 
 // Protect all routes after this middleware
 router.use(protect);

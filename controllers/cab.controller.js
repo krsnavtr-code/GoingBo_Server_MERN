@@ -556,6 +556,82 @@ export const updateCabRoute = catchAsync(async (req, res, next) => {
 });
 
 // Admin: Remove a route from a cab
+// @desc    Register a new cab (public)
+// @route   POST /api/v1/cabs/register
+// @access  Public
+export const registerCab = catchAsync(async (req, res, next) => {
+  const {
+    name,
+    email,
+    phone,
+    cabType = 'economy', // Default to economy if not provided
+    cabNumber,
+    city,
+    availability = true
+  } = req.body;
+  
+  // Validate required fields
+  if (!name || !phone || !cabNumber) {
+    return next(new AppError('Please provide name, phone, and cab number', 400));
+  }
+
+  // Create a new cab document
+  const newCab = await Cab.create({
+    name: `Cab ${cabNumber}`, // You might want to customize this
+    type: cabType.toLowerCase(),
+    capacity: getDefaultCapacity(cabType),
+    registrationNumber: cabNumber,
+    driver: {
+      name,
+      phone,
+      licenseNumber: 'PENDING' // Will be updated after verification
+    },
+    isAvailable: availability,
+    routes: [{
+      from: city,
+      to: city,
+      isActive: true
+    }],
+    pricePerKm: getDefaultPricePerKm(cabType),
+    isActive: false // Set to false until verified by admin
+  });
+
+  // TODO: Send email notification to admin about new cab registration
+  // TODO: Send confirmation email to cab owner
+
+  res.status(201).json({
+    status: 'success',
+    message: 'Cab registration submitted successfully. Our team will contact you shortly for verification.',
+    data: {
+      cab: newCab
+    }
+  });
+});
+
+// Helper function to get default capacity based on cab type
+const getDefaultCapacity = (cabType) => {
+  const capacities = {
+    'sedan': 4,
+    'suv': 6,
+    'luxury': 4,
+    'muv': 8,
+    'tempo traveler': 12
+  };
+  return capacities[cabType.toLowerCase()] || 4;
+};
+
+// Helper function to get default price per km based on cab type
+const getDefaultPricePerKm = (cabType) => {
+  const prices = {
+    'sedan': 12,
+    'suv': 15,
+    'luxury': 25,
+    'muv': 18,
+    'tempo traveler': 20
+  };
+  return prices[cabType.toLowerCase()] || 15;
+};
+
 export const removeCabRoute = catchAsync(async (req, res, next) => {
   const { routeId } = req.params;
   

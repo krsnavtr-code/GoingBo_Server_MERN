@@ -63,6 +63,34 @@ const createSendToken = (user, statusCode, res) => {
   });
 };
 
+// Check if email exists and return role if it does
+export const checkEmail = catchAsync(async (req, res, next) => {
+  const { email } = req.query;
+  
+  if (!email) {
+    return next(new AppError('Email is required', 400));
+  }
+  
+  const user = await User.findOne({ email });
+  
+  if (!user) {
+    return res.status(200).json({
+      status: 'success',
+      data: {
+        exists: false
+      }
+    });
+  }
+  
+  res.status(200).json({
+    status: 'success',
+    data: {
+      exists: true,
+      role: user.role
+    }
+  });
+});
+
 export const signup = catchAsync(async (req, res, next) => {
   const newUser = await User.create({
     name: req.body.name,
@@ -129,14 +157,16 @@ export const forgotPassword = catchAsync(async (req, res, next) => {
 
   await user.save({ validateBeforeSave: false });
 
-  // 3) Send it to user's email
-  const message = `Your password reset OTP is: ${otp}\nIf you didn't request this, please ignore this email.`;
-
+  // 3) Send it to user's email using template
   try {
     await sendEmail({
-      email: user.email,
+      to: user.email,
       subject: 'Your password reset OTP (valid for 10 min)',
-      message
+      template: 'passwordReset',
+      data: {
+        name: user.name || 'User',
+        otp: otp
+      }
     });
 
     res.status(200).json({
@@ -241,6 +271,150 @@ export const protect = catchAsync(async (req, res, next) => {
   // GRANT ACCESS TO PROTECTED ROUTE
   req.user = currentUser;
   next();
+});
+
+// Send verification email with OTP
+const sendVerificationEmail = async (user) => {
+  const otp = generateOTP();
+  user.emailVerificationOTP = otp;
+  user.emailVerificationExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+  await user.save({ validateBeforeSave: false });
+
+  if (process.env.NODE_ENV === 'development') {
+    // In development, just log the OTP to console
+    console.log('=== DEVELOPMENT MODE: Email Verification OTP ===');
+    console.log(`To: ${user.email}`);
+    console.log(`OTP: ${otp}`);
+    console.log('==============================================');
+    return true;
+  }
+  
+  // In production, try to send the actual email
+  try {
+    await sendEmail({
+      to: user.email,
+      subject: 'Verify Your Email for Cab Owner Registration',
+      template: 'passwordReset',
+      data: {
+        name: user.name || 'Valued Customer',
+        otp: otp
+      }
+    });
+    return true;
+  } catch (err) {
+    console.error('Error sending verification email:', err);
+    user.emailVerificationOTP = undefined;
+    user.emailVerificationExpires = undefined;
+    await user.save({ validateBeforeSave: false });
+    throw new Error('There was an error sending the verification email. Please try again.');
+  }
+};
+
+export const registerCabOwner = catchAsync(async (req, res, next) => {
+  // 1) Check if user with email already exists
+  const existingUser = await User.findOne({ email: req.body.email });
+  
+  if (existingUser) {
+    return next(new AppError('User with this email already exists', 400));
+  }
+
+  // 2) Create new user with cab-owner role
+  const newUser = await User.create({
+    name: req.body.name,
+    email: req.body.email,
+    password: req.body.password,
+    passwordConfirm: req.body.passwordConfirm,
+    phone: req.body.phone,
+    role: 'cab-owner',
+    isEmailVerified: false
+  });
+
+  // 3) Send verification email with OTP
+  await sendVerificationEmail(newUser);
+
+  // 4) Send response without sensitive data
+  newUser.password = undefined;
+  
+  res.status(201).json({
+    status: 'success',
+    message: 'Verification OTP sent to your email',
+    data: {
+      userId: newUser._id,
+      email: newUser.email
+    }
+  });
+});
+
+export const verifyCabOwnerEmail = catchAsync(async (req, res, next) => {
+  const { email, otp } = req.body;
+
+  // 1) Find user by email and check OTP
+  const user = await User.findOne({
+    email,
+    emailVerificationOTP: otp,
+    emailVerificationExpires: { $gt: Date.now() }
+  });
+
+  if (!user) {
+    return next(new AppError('Invalid or expired OTP', 400));
+  }
+
+  // 2) Update user as verified
+  user.isEmailVerified = true;
+  user.emailVerificationOTP = undefined;
+  user.emailVerificationExpires = undefined;
+  await user.save({ validateBeforeSave: false });
+
+  // 3) Create token
+  const token = signToken(user._id);
+  
+  // 4) Send response with token in body
+  res.status(200).json({
+    status: 'success',
+    token,
+    data: {
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    }
+  });
+});
+
+export const resendVerificationOTP = catchAsync(async (req, res, next) => {
+  const { email, isCabRegistration = false } = req.body;
+  
+  // 1) Find user by email
+  const user = await User.findOne({ email });
+  
+  if (!user && !isCabRegistration) {
+    return next(new AppError('No user found with this email', 404));
+  }
+  
+  // For cab registration, create a temporary user if not exists
+  let currentUser = user;
+  if (!user && isCabRegistration) {
+    currentUser = new User({
+      name: 'Cab Owner', // Temporary name, will be updated during registration
+      email,
+      role: 'cab-owner',
+      isEmailVerified: false
+    });
+  }
+  
+  if (user && user.isEmailVerified && !isCabRegistration) {
+    return next(new AppError('Email is already verified', 400));
+  }
+  
+  // 2) Generate and send new OTP
+  await sendVerificationEmail(currentUser);
+  
+  res.status(200).json({
+    status: 'success',
+    message: 'New verification OTP sent to your email'
+  });
 });
 
 export const updateProfile = catchAsync(async (req, res, next) => {
