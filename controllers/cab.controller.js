@@ -195,6 +195,82 @@ export const deleteCab = catchAsync(async (req, res, next) => {
 });
 
 // Admin: Get all cab bookings with filtering
+// Create a new cab booking
+export const createCabBooking = catchAsync(async (req, res, next) => {
+  const {
+    cab,
+    pickupLocation,
+    dropoffLocation,
+    pickupTime,
+    distance = 10, // Default distance if not provided
+    passengerName,
+    passengerEmail,
+    passengerPhone,
+    specialRequests = '',
+    paymentMethod = 'cash',
+    totalAmount
+  } = req.body;
+
+  // Validate required fields
+  if (!cab || !pickupLocation || !dropoffLocation || !pickupTime || 
+      !passengerName || !passengerEmail || !passengerPhone) {
+    return next(new AppError('Please provide all required booking details', 400));
+  }
+
+  // Generate a booking reference (e.g., 'GB' + timestamp + random string)
+  const generateBookingReference = () => {
+    const timestamp = Date.now().toString(36).toUpperCase();
+    const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return `GB-${timestamp}-${randomStr}`;
+  };
+
+  // Create the booking
+  const booking = await CabBooking.create({
+    user: req.user.id,
+    cab,
+    bookingReference: generateBookingReference(),
+    pickupLocation: {
+      type: 'Point',
+      coordinates: pickupLocation.coordinates || [0, 0],
+      address: pickupLocation.address || '',
+      name: pickupLocation.name || 'Pickup Location',
+      contactNumber: pickupLocation.contactNumber || passengerPhone
+    },
+    dropoffLocation: {
+      type: 'Point',
+      coordinates: dropoffLocation.coordinates || [0, 0],
+      address: dropoffLocation.address || '',
+      name: dropoffLocation.name || 'Drop-off Location'
+    },
+    pickupTime: new Date(pickupTime),
+    distance,
+    fare: totalAmount,
+    passengerName,
+    passengerEmail,
+    passengerPhone,
+    specialRequests,
+    paymentMethod,
+    totalAmount,
+    status: 'pending',
+    paymentStatus: paymentMethod === 'cash' ? 'pending' : 'paid'
+  });
+
+  // Update cab availability
+  await Cab.findByIdAndUpdate(cab, { isAvailable: false });
+
+  // Populate the booking with cab and user details
+  const populatedBooking = await CabBooking.findById(booking._id)
+    .populate('user', 'name email phone')
+    .populate('cab', 'name type registrationNumber');
+
+  res.status(201).json({
+    status: 'success',
+    data: {
+      booking: populatedBooking
+    }
+  });
+});
+
 export const getAllCabBookings = catchAsync(async (req, res, next) => {
   const features = new APIFeatures(CabBooking.find()
     .populate('user', 'name email phone')
@@ -272,6 +348,21 @@ export const updateBookingStatus = catchAsync(async (req, res, next) => {
 });
 
 // Admin: Get cab statistics
+// Get current user's bookings
+export const getMyBookings = catchAsync(async (req, res, next) => {
+  const bookings = await CabBooking.find({ user: req.user.id })
+    .sort('-createdAt')
+    .populate('cab', 'name type registrationNumber');
+
+  res.status(200).json({
+    status: 'success',
+    results: bookings.length,
+    data: {
+      bookings
+    }
+  });
+});
+
 export const getCabStats = catchAsync(async (req, res, next) => {
   const stats = await Cab.aggregate([
     {
@@ -337,44 +428,58 @@ export const getCabStats = catchAsync(async (req, res, next) => {
   });
 });
 
-// Admin: Find available cabs by route
+// Find available cabs by route
 export const findAvailableCabs = catchAsync(async (req, res, next) => {
-  const { from, to, cabType, capacity } = req.query;
-  
-  if (!from || !to) {
-    return next(new AppError('Both "from" and "to" parameters are required', 400));
-  }
-  
-  // Basic query for available cabs
-  let query = { isAvailable: true };
-  
-  if (cabType) {
-    query.type = cabType;
-  }
-  
-  if (capacity) {
-    query.capacity = { $gte: parseInt(capacity, 10) };
-  }
-  
-  // Find cabs that have a matching route
-  const cabs = await Cab.find({
-    ...query,
-    'routes': {
-      $elemMatch: {
-        from: { $regex: new RegExp(`^${from}$`, 'i') },
-        to: { $regex: new RegExp(`^${to}$`, 'i') },
-        isActive: true
-      }
+  try {
+    const { from, to, cabType, capacity } = req.query;
+    
+    // Input validation
+    if (!from || !to) {
+      return next(new AppError('Both "from" and "to" parameters are required', 400));
     }
-  });
-  
-  res.status(200).json({
-    status: 'success',
-    results: cabs.length,
-    data: {
-      cabs,
-    },
-  });
+    
+    // Basic query for available cabs
+    let query = { isAvailable: true };
+    
+    // Add optional filters
+    if (cabType) {
+      query.type = { $regex: new RegExp(`^${cabType}$`, 'i') };
+    }
+    
+    if (capacity && !isNaN(capacity)) {
+      query.capacity = { $gte: parseInt(capacity, 10) };
+    }
+    
+    // Find cabs with matching routes (case-insensitive partial match)
+    const cabs = await Cab.find({
+      ...query,
+      'routes': {
+        $elemMatch: {
+          from: { $regex: new RegExp(from, 'i') },
+          to: { $regex: new RegExp(to, 'i') },
+          isActive: true
+        }
+      }
+    }).select('-__v -createdAt -updatedAt');
+    
+    // Format response to match frontend expectations
+    res.status(200).json({
+      status: 'success',
+      data: {
+        cabs: cabs.map(cab => ({
+          ...cab.toObject(),
+          id: cab._id,
+          image: cab.images?.[0] || '/images/cabs/default.png',
+          rating: cab.rating || 4.5, // Default rating if not set
+          baseFare: cab.baseFare || 100 // Default base fare if not set
+        }))
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error finding available cabs:', error);
+    next(new AppError('Error searching for cabs. Please try again later.', 500));
+  }
 });
 
 // Admin: Add a new route to a cab

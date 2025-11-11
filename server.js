@@ -98,6 +98,7 @@ app.use('/api/v1/users', userRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/media', mediaRouter);
 app.use('/api/v1/blog', blogRoutes);
+
 app.use('/api/v1', publicRouter);
 app.use('/api/v1/packages', projectRoutes);
 app.use('/api/v1/flights', flightRoutes);
@@ -105,6 +106,7 @@ app.use('/api/v1/hotels', hotelRoutes);
 app.use('/api/v1/faqs', faqsRoutes);
 app.use('/api/v1/admin', dynamicFieldRoutes);
 app.use('/api/v1/admin/cabs', cabRoutes);
+app.use('/api/v1/cabs', cabRoutes);
 
 // Ensure uploads directory exists
 const uploadsDir = path.resolve(__dirname, 'uploads');

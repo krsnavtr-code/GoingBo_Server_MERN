@@ -18,20 +18,30 @@ import {
   getAllDrivers,
   getCabSettings,
   updateCabSettings,
+  createCabBooking,
+  getMyBookings,
 } from '../controllers/cab.controller.js';
 
 const router = express.Router();
 
+// Public route for finding available cabs
+router.get('/available', findAvailableCabs);
+
 // Protect all routes after this middleware
 router.use(protect);
 
-// Only admin can access these routes
-router.use(restrictTo('admin'));
-
 // Cab booking routes - these need to come before the /:id route
+// User's own bookings
+router.get('/my-bookings', getMyBookings);
+
+// Admin booking routes
 router
   .route('/bookings')
-  .get(getAllCabBookings);
+  .get(restrictTo('admin'), getAllCabBookings)  // Only admin can view all bookings
+  .post(createCabBooking);  // Any authenticated user can create a booking
+
+// Only admin can access routes after this point
+router.use(restrictTo('admin'));
 
 router
   .route('/bookings/:id')
