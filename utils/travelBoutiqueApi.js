@@ -193,22 +193,11 @@ async function authenticate() {
             });
         }
 
-        // Construct the full authentication URL
-        const authUrl = `${CONFIG.baseUrl}${CONFIG.authUrl}`;
-        
-        if (CONFIG.debug) {
-            console.log('🔑 Full Auth URL:', authUrl);
-        }
-
         // Make the authentication request
         const response = await axios({
             method: 'post',
-            url: authUrl,
+            url: CONFIG.authUrl,
             data: authData.toString(),
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Accept': 'application/json'
-            },
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'Accept': 'application/json',
@@ -346,12 +335,14 @@ async function makeRequest(endpoint, params = {}, req = {}, useBookingApi = fals
             throw new Error('No authentication token available');
         }
 
-        // Determine the base URL to use
-        const baseUrl = useBookingApi ? CONFIG.bookingBaseUrl : CONFIG.flightBaseUrl;
-        const apiUrl = `${baseUrl}${endpoint}`;
-        
-        if (CONFIG.debug) {
-            console.log(`🌐 [${traceId}] API URL:`, apiUrl);
+        // Determine the endpoint URL
+        let apiUrl;
+        if (endpoint === '/Search') {
+            apiUrl = CONFIG.flightSearchUrl;
+        } else if (useBookingApi) {
+            apiUrl = `${CONFIG.baseUrl}${endpoint}`;
+        } else {
+            apiUrl = `${CONFIG.baseUrl}${endpoint}`;
         }
 
         // Prepare request parameters
