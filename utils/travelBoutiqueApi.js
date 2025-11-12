@@ -224,18 +224,45 @@ const makeRequest = async (endpoint, params, req, useBookingApi = false) => {
 export const searchFlights = async (searchParams, req) => {
     if (USE_MOCK) {
         console.log('🔍 Using mock flight search');
-        // Return mock flight data
+        // Return mock flight data for testing
         return {
-            status: 'success',
-            data: {
-                results: [
-                    // Mock flight data here
-                ]
-            }
+            success: true,
+            data: [
+                {
+                    id: 'FL123',
+                    airline: 'IndiGo',
+                    flightNumber: '6E-123',
+                    origin: searchParams.origin || 'DEL',
+                    destination: searchParams.destination || 'BOM',
+                    departureTime: '2024-12-15T08:00:00',
+                    arrivalTime: '2024-12-15T10:15:00',
+                    duration: '2h 15m',
+                    price: 4500,
+                    currency: 'INR',
+                    availableSeats: 5,
+                    sessionId: 'test-session-123',
+                    resultIndex: '1'
+                }
+            ]
         };
     }
 
-    return makeRequest('/search', searchParams, req);
+    try {
+        const response = await makeRequest('/search', searchParams, req);
+        return {
+            success: true,
+            data: response.data.results || []
+        };
+    } catch (error) {
+        console.error('Flight search error:', error);
+        return {
+            success: false,
+            error: {
+                code: 'SEARCH_ERROR',
+                message: error.response?.data?.error?.message || 'Failed to search for flights'
+            }
+        };
+    }
 };
 
 /**
