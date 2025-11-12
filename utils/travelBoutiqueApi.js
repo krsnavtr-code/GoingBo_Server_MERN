@@ -42,7 +42,7 @@ let token = null;
  * Get the client's IP address
  */
 const getClientIp = (req) => {
-    return req?.ip || '127.0.0.1';
+    return req?.ip || '82.112.236.83';
 };
 
 /**
