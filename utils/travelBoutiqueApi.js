@@ -128,7 +128,7 @@ export const authenticate = async () => {
             ClientId: CONFIG.clientId,
             UserName: process.env.TRAVEL_BOUTIQUE_USERNAME,
             Password: process.env.TRAVEL_BOUTIQUE_PASSWORD,
-            EndUserIp: '127.0.0.1' // Default IP for server-side calls
+            EndUserIp: '82.112.236.83' // Default IP for server-side calls
         };
 
         console.log('Auth request data:', JSON.stringify(authData, null, 2));
