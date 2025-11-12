@@ -100,7 +100,7 @@ app.use('/api/v1/media', mediaRouter);
 app.use('/api/v1/blog', blogRoutes);
 
 app.use('/api/v1', publicRouter);
-app.use('/api/v1/packages', projectRoutes);
+app.use('/v1/packages', projectRoutes);
 app.use('/api/v1/flights', flightRoutes);
 app.use('/api/v1/hotels', hotelRoutes);
 app.use('/api/v1/faqs', faqsRoutes);
