@@ -120,30 +120,45 @@ export const authenticate = async () => {
             return mockToken;
         }
 
-        // TBO API requires JSON payload for authentication
+        // Ensure we have all required credentials
+        if (!process.env.TRAVEL_BOUTIQUE_CLIENT_ID || !process.env.TRAVEL_BOUTIQUE_USERNAME || !process.env.TRAVEL_BOUTIQUE_PASSWORD) {
+            throw new Error('Missing required TBO API credentials in environment variables');
+        }
+
+        // TBO API authentication endpoint
         const authUrl = `${CONFIG.baseUrl}/SharedAPI/SharedData.svc/rest/Authenticate`;
         logMessage(`🔑 Authenticating with TBO API: ${authUrl}`);
 
-        const authData = {
+        // Prepare authentication request
+        const authData = new URLSearchParams();
+        authData.append('ClientId', CONFIG.clientId);
+        authData.append('UserName', process.env.TRAVEL_BOUTIQUE_USERNAME);
+        authData.append('Password', process.env.TRAVEL_BOUTIQUE_PASSWORD);
+        authData.append('EndUserIp', '82.112.236.83');
+
+        console.log('Auth request data:', {
             ClientId: CONFIG.clientId,
             UserName: process.env.TRAVEL_BOUTIQUE_USERNAME,
-            Password: process.env.TRAVEL_BOUTIQUE_PASSWORD,
-            EndUserIp: '82.112.236.83' // Default IP for server-side calls
-        };
+            Password: '***',
+            EndUserIp: '82.112.236.83'
+        });
 
-        console.log('Auth request data:', JSON.stringify(authData, null, 2));
-
+        // Make the authentication request
         const response = await axios({
             method: 'post',
             url: authUrl,
             data: authData,
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded',
                 'Accept': 'application/json'
             },
             timeout: 15000, // 15 seconds timeout for auth
             validateStatus: (status) => status >= 200 && status < 500
         });
+
+        console.log('Auth response status:', response.status);
+        console.log('Auth response headers:', response.headers);
+        console.log('Auth response data:', response.data);
 
         console.log('Auth response:', {
             status: response.status,
@@ -281,6 +296,9 @@ const makeRequest = async (endpoint, params, req, useBookingApi = false) => {
  * Search for flights
  */
 export const searchFlights = async (searchParams, req) => {
+    // Use VPS IP as the default IP
+    const clientIp = '82.112.236.83';
+    
     if (USE_MOCK) {
         console.log('🔍 Using mock flight search');
         // Return mock flight data for testing
@@ -309,7 +327,7 @@ export const searchFlights = async (searchParams, req) => {
     try {
         // Format search parameters according to TBO API requirements
         const tboSearchParams = {
-            EndUserIp: getClientIp(req),
+            EndUserIp: clientIp,
             TokenId: '', // Will be set in makeRequest
             AdultCount: parseInt(searchParams.adults) || 1,
             ChildCount: parseInt(searchParams.children) || 0,
