@@ -24,13 +24,18 @@ dotenv.config();
 // TBO API Configuration
 const CONFIG = {
     // Authentication
-    clientId: 'ApiIntegrationNew',
+    clientId: process.env.TRAVEL_BOUTIQUE_CLIENT_ID || 'ApiIntegrationNew',
     username: process.env.TRAVEL_BOUTIQUE_USERNAME || 'DELG738',
     password: process.env.TRAVEL_BOUTIQUE_PASSWORD || 'Htl@DEL#38/G',
     
     // API Endpoints
-    authUrl: 'https://api.tektravels.com/SharedAPI/SharedData.svc/rest/authenticate',
-    flightSearchUrl: 'https://api.tektravels.com/SharedAPI/SharedData.svc/rest/Search',
+    baseUrl: process.env.TRAVEL_BOUTIQUE_API_URL || 'https://api.tektravels.com/SharedAPI/SharedData.svc/rest',
+    flightBaseUrl: process.env.TRAVEL_BOUTIQUE_FLIGHT_API_URL || 'https://api.tektravels.com/SharedAPI/SharedData.svc/rest',
+    bookingBaseUrl: process.env.TRAVEL_BOUTIQUE_BOOKING_API_URL || 'https://api.tektravels.com/Booking/Service.svc/rest',
+    
+    // Endpoints
+    authUrl: '/authenticate',
+    flightSearchUrl: '/Search',
     
     // File paths
     tokenFile: path.join(TOKEN_DIR, 'tbo_token.json'),
@@ -41,11 +46,11 @@ const CONFIG = {
     timeout: 30000, // 30 seconds
     
     // Debug
-    debug: true
+    debug: process.env.NODE_ENV === 'development'
 };
 
-// Enable mock mode in development
-const USE_MOCK = process.env.NODE_ENV === 'development' && process.env.USE_MOCK !== 'false';
+// Enable mock mode if explicitly set in environment
+const USE_MOCK = process.env.USE_MOCK === 'true';
 
 // Generate a unique trace ID
 const generateTraceId = () => {
@@ -149,9 +154,10 @@ const isTokenValid = (tokenToCheck = token) => {
 };
 
 /**
- * Authenticate with TBO API using OAuth2 client credentials
+ * Authenticate with TBO API
+ * @returns {Promise<Object>} Authentication token
  */
-export const authenticate = async () => {
+async function authenticate() {
     try {
         if (USE_MOCK) {
             console.log('🔐 Using mock authentication');
@@ -187,11 +193,22 @@ export const authenticate = async () => {
             });
         }
 
+        // Construct the full authentication URL
+        const authUrl = `${CONFIG.baseUrl}${CONFIG.authUrl}`;
+        
+        if (CONFIG.debug) {
+            console.log('🔑 Full Auth URL:', authUrl);
+        }
+
         // Make the authentication request
         const response = await axios({
             method: 'post',
-            url: CONFIG.authUrl,
+            url: authUrl,
             data: authData.toString(),
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Accept': 'application/json'
+            },
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'Accept': 'application/json',
@@ -292,8 +309,13 @@ export const authenticate = async () => {
 
 /**
  * Make authenticated request to TBO API
+ * @param {string} endpoint - API endpoint
+ * @param {Object} params - Request parameters
+ * @param {Object} req - Express request object
+ * @param {boolean} useBookingApi - Whether to use booking API
+ * @returns {Promise<Object>} API response
  */
-const makeRequest = async (endpoint, params = {}, req = {}, useBookingApi = false) => {
+async function makeRequest(endpoint, params = {}, req = {}, useBookingApi = false) {
     const startTime = Date.now();
     const traceId = generateTraceId();
     let response;
@@ -324,14 +346,12 @@ const makeRequest = async (endpoint, params = {}, req = {}, useBookingApi = fals
             throw new Error('No authentication token available');
         }
 
-        // Determine the endpoint URL
-        let apiUrl;
-        if (endpoint === '/Search') {
-            apiUrl = CONFIG.flightSearchUrl;
-        } else if (useBookingApi) {
-            apiUrl = `${CONFIG.baseUrl}${endpoint}`;
-        } else {
-            apiUrl = `${CONFIG.baseUrl}${endpoint}`;
+        // Determine the base URL to use
+        const baseUrl = useBookingApi ? CONFIG.bookingBaseUrl : CONFIG.flightBaseUrl;
+        const apiUrl = `${baseUrl}${endpoint}`;
+        
+        if (CONFIG.debug) {
+            console.log(`🌐 [${traceId}] API URL:`, apiUrl);
         }
 
         // Prepare request parameters
@@ -348,12 +368,8 @@ const makeRequest = async (endpoint, params = {}, req = {}, useBookingApi = fals
 
         // Log the request (without sensitive data)
         const loggableParams = { ...requestParams };
-        if (loggableParams.TokenId) {
-            loggableParams.TokenId = '***' + loggableParams.TokenId.slice(-4);
-        }
-        if (loggableParams.Password) {
-            loggableParams.Password = '***';
-        }
+        if (loggableParams.TokenId) loggableParams.TokenId = '***' + loggableParams.TokenId.slice(-4);
+        if (loggableParams.Password) loggableParams.Password = '***';
 
         // Log the API call
         if (CONFIG.debug) {
@@ -605,6 +621,21 @@ const makeRequest = async (endpoint, params = {}, req = {}, useBookingApi = fals
  * @param {Object} req - Express request object
  * @returns {Promise<Object>} Search results
  */
+/**
+ * Search for flights
+ * @param {Object} searchParams - Search parameters
+ * @param {string} searchParams.origin - Origin airport code (e.g., 'DEL')
+ * @param {string} searchParams.destination - Destination airport code (e.g., 'BOM')
+ * @param {string} searchParams.departureDate - Departure date (YYYY-MM-DD)
+ * @param {string} [searchParams.returnDate] - Return date for round trips (YYYY-MM-DD)
+ * @param {number} [searchParams.adults=1] - Number of adult passengers
+ * @param {number} [searchParams.children=0] - Number of child passengers
+ * @param {number} [searchParams.infants=0] - Number of infant passengers
+ * @param {string} [searchParams.cabinClass='Economy'] - Cabin class (Economy, Business, First)
+ * @param {string} [searchParams.journeyType='1'] - Journey type ('1' for one-way, '2' for round-trip)
+ * @param {Object} req - Express request object
+ * @returns {Promise<Object>} Search results
+ */
 export const searchFlights = async (searchParams = {}, req = {}) => {
     const traceId = generateTraceId();
     
@@ -626,8 +657,14 @@ export const searchFlights = async (searchParams = {}, req = {}) => {
                 currency: 'INR',
                 availableSeats: 5,
                 sessionId: 'test-session-123',
-                resultIndex: '1'
-            }]
+                resultIndex: '1',
+                fareRules: {
+                    refundable: false,
+                    changes: 'Not allowed',
+                    baggage: '7kg cabin + 15kg check-in'
+                }
+            }],
+            traceId
         };
     }
 
