@@ -91,7 +91,7 @@ const hotelSchema = new mongoose.Schema({
 });
 
 // Update the updatedAt field before saving
-otelSchema.pre('save', function(next) {
+hotelSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();
 });
