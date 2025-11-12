@@ -23,27 +23,73 @@ dotenv.config();
 
 // TBO API Configuration
 const CONFIG = {
-    clientId: process.env.TRAVEL_BOUTIQUE_CLIENT_ID,
-    clientSecret: process.env.TRAVEL_BOUTIQUE_CLIENT_SECRET,
-    baseUrl: process.env.TRAVEL_BOUTIQUE_API_URL,
-    flightApiUrl: process.env.TRAVEL_BOUTIQUE_FLIGHT_API_URL,
-    bookingApiUrl: process.env.TRAVEL_BOUTIQUE_BOOKING_API_URL,
+    // Authentication
+    clientId: 'ApiIntegrationNew',
+    username: process.env.TRAVEL_BOUTIQUE_USERNAME || 'DELG738',
+    password: process.env.TRAVEL_BOUTIQUE_PASSWORD || 'Htl@DEL#38/G',
+    
+    // API Endpoints
+    authUrl: 'https://api.tektravels.com/SharedAPI/SharedData.svc/rest/authenticate',
+    flightSearchUrl: 'https://api.tektravels.com/SharedAPI/SharedData.svc/rest/Search',
+    
+    // File paths
     tokenFile: path.join(TOKEN_DIR, 'tbo_token.json'),
-    logFile: path.join(LOG_DIR, `log_${new Date().toISOString().split('T')[0]}.txt`)
+    logFile: path.join(LOG_DIR, `api_logs_${new Date().toISOString().split('T')[0]}.json`),
+    
+    // Network
+    vpsIp: '82.112.236.83',
+    timeout: 30000, // 30 seconds
+    
+    // Debug
+    debug: true
 };
 
 // Enable mock mode in development
 const USE_MOCK = process.env.NODE_ENV === 'development' && process.env.USE_MOCK !== 'false';
 
+// Generate a unique trace ID
+const generateTraceId = () => {
+    return 't' + Date.now() + Math.random().toString(36).substr(2, 9);
+};
+
+// Track active trace IDs and their expiration
+const activeTraces = new Map();
+
+// Log API calls in JSON format
+const logApiCall = async (type, data) => {
+    try {
+        const logEntry = {
+            timestamp: new Date().toISOString(),
+            type,
+            traceId: data.traceId,
+            endpoint: data.endpoint,
+            request: data.request,
+            response: data.response,
+            error: data.error,
+            durationMs: data.durationMs
+        };
+
+        // Ensure log directory exists
+        if (!fs.existsSync(LOG_DIR)) {
+            fs.mkdirSync(LOG_DIR, { recursive: true });
+        }
+
+        // Append to log file
+        const logData = fs.existsSync(CONFIG.logFile) 
+            ? JSON.parse(await fs.promises.readFile(CONFIG.logFile, 'utf8'))
+            : [];
+        
+        logData.push(logEntry);
+        await fs.promises.writeFile(CONFIG.logFile, JSON.stringify(logData, null, 2));
+        
+        return logEntry;
+    } catch (error) {
+        console.error('Error writing to API log:', error);
+    }
+};
+
 // Token management
 let token = null;
-
-/**
- * Get the client's IP address
- */
-const getClientIp = (req) => {
-    return req?.ip || '82.112.236.83';
-};
 
 /**
  * Log messages to file
@@ -121,71 +167,125 @@ export const authenticate = async () => {
         }
 
         // Ensure we have all required credentials
-        if (!process.env.TRAVEL_BOUTIQUE_CLIENT_ID || !process.env.TRAVEL_BOUTIQUE_USERNAME || !process.env.TRAVEL_BOUTIQUE_PASSWORD) {
-            throw new Error('Missing required TBO API credentials in environment variables');
-        }
-
-        // TBO API authentication endpoint
-        const authUrl = `${CONFIG.baseUrl}/SharedAPI/SharedData.svc/rest/Authenticate`;
-        logMessage(`🔑 Authenticating with TBO API: ${authUrl}`);
-
-        // Prepare authentication request
         const authData = new URLSearchParams();
         authData.append('ClientId', CONFIG.clientId);
-        authData.append('UserName', process.env.TRAVEL_BOUTIQUE_USERNAME);
-        authData.append('Password', process.env.TRAVEL_BOUTIQUE_PASSWORD);
-        authData.append('EndUserIp', '82.112.236.83');
+        authData.append('UserName', CONFIG.username);
+        authData.append('Password', CONFIG.password);
+        authData.append('EndUserIp', CONFIG.vpsIp);
+        authData.append('LoginType', '1'); // 1 for API user
 
-        console.log('Auth request data:', {
-            ClientId: CONFIG.clientId,
-            UserName: process.env.TRAVEL_BOUTIQUE_USERNAME,
-            Password: '***',
-            EndUserIp: '82.112.236.83'
-        });
+        if (CONFIG.debug) {
+            console.log('🔑 Auth Request:', {
+                url: CONFIG.authUrl,
+                data: {
+                    ClientId: CONFIG.clientId,
+                    UserName: CONFIG.username,
+                    Password: '***',
+                    EndUserIp: CONFIG.vpsIp,
+                    LoginType: '1'
+                }
+            });
+        }
 
         // Make the authentication request
         const response = await axios({
             method: 'post',
-            url: authUrl,
-            data: authData,
+            url: CONFIG.authUrl,
+            data: authData.toString(),
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
-                'Accept': 'application/json'
+                'Accept': 'application/json',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'User-Agent': 'GoingBo/1.0'
             },
-            timeout: 15000, // 15 seconds timeout for auth
-            validateStatus: (status) => status >= 200 && status < 500
+            timeout: CONFIG.timeout,
+            // Handle different response formats
+            transformResponse: [function (data) {
+                try {
+                    return JSON.parse(data);
+                } catch (e) {
+                    return { raw: data };
+                }
+            }]
         });
 
-        console.log('Auth response status:', response.status);
-        console.log('Auth response headers:', response.headers);
-        console.log('Auth response data:', response.data);
-
-        console.log('Auth response:', {
-            status: response.status,
-            data: response.data
-        });
-
-        if (response.data && response.data.TokenId) {
-            const tokenData = {
-                TokenId: response.data.TokenId,
-                Expiry: response.data.Expiry,
-                TokenType: 'Bearer',
-                date: Date.now(),
-                expires_in: 3600, // TBO tokens typically expire in 1 hour
-                // For backward compatibility
-                access_token: response.data.TokenId,
-                token_type: 'Bearer'
-            };
-            
-            saveToken(tokenData);
-            return tokenData;
-        } else if (response.data && response.data.Error) {
-            throw new Error(response.data.Error.ErrorMessage || 'Authentication failed');
+        if (CONFIG.debug) {
+            console.log('🔑 Auth Response:', {
+                status: response.status,
+                statusText: response.statusText,
+                headers: response.headers,
+                data: response.data
+            });
         }
+
+        // Handle different response formats
+        let tokenData;
+        const responseData = response.data;
+
+        // Check for successful response with token
+        if (responseData && responseData.TokenId) {
+            tokenData = responseData;
+        } 
+        // Check for error in response
+        else if (responseData && responseData.error) {
+            throw new Error(responseData.error);
+        }
+        // Check for string response (common for some TBO endpoints)
+        else if (typeof responseData === 'string') {
+            if (responseData.includes('Invalid')) {
+                throw new Error(responseData);
+            }
+            // Try to parse as JSON if it's a string
+            try {
+                const parsed = JSON.parse(responseData);
+                if (parsed.TokenId) {
+                    tokenData = parsed;
+                } else {
+                    throw new Error('Invalid token in response');
+                }
+            } catch (e) {
+                throw new Error(`Invalid response: ${responseData}`);
+            }
+        } else {
+            throw new Error('Invalid response format from TBO API');
+        }
+
+        // Calculate token expiration (default to 23 hours to be safe)
+        const expiresIn = tokenData.ExpiresIn || (23 * 60 * 60);
+        
+        // Save token to file
+        const tokenToSave = {
+            ...tokenData,
+            expires_at: Date.now() + (expiresIn * 1000) // Convert to milliseconds
+        };
+
+        // Ensure token directory exists
+        await fs.promises.mkdir(path.dirname(CONFIG.tokenFile), { recursive: true });
+        await fs.promises.writeFile(CONFIG.tokenFile, JSON.stringify(tokenToSave, null, 2));
+        
+        console.log('✅ Authentication successful');
+        return tokenToSave;
+
     } catch (error) {
-        const errorMsg = `Authentication Error: ${error.message}\n${error.response?.data ? JSON.stringify(error.response.data) : ''}`;
-        logMessage(errorMsg);
-        console.error('❌', errorMsg);
+        const errorDetails = error.response?.data 
+            ? typeof error.response.data === 'object' 
+                ? JSON.stringify(error.response.data, null, 2)
+                : error.response.data
+            : error.message;
+            
+        const errorMsg = `❌ Authentication Error: ${error.message}\n${errorDetails}`;
+        console.error(errorMsg);
+        
+        // Log to file
+        await logApiCall('AUTH_ERROR', {
+            error: {
+                message: error.message,
+                response: error.response?.data,
+                status: error.response?.status,
+                stack: error.stack
+            }
+        });
+        
         throw new Error('Authentication failed: ' + (error.response?.data?.message || error.message));
     }
 };
@@ -193,28 +293,57 @@ export const authenticate = async () => {
 /**
  * Make authenticated request to TBO API
  */
-const makeRequest = async (endpoint, params, req, useBookingApi = false) => {
+const makeRequest = async (endpoint, params = {}, req = {}, useBookingApi = false) => {
+    const startTime = Date.now();
+    const traceId = generateTraceId();
+    let response;
+    
     try {
         if (USE_MOCK) {
             console.log(`🔧 Mock API Call: ${endpoint}`);
-            return { status: 'success', data: { mock: true } };
+            return { 
+                Response: {
+                    Status: 1,
+                    Results: [{
+                        IsError: false,
+                        TraceId: `mock-${Date.now()}`,
+                        ...(params || {})
+                    }]
+                }
+            };
         }
 
         // Ensure we have a valid token
         if (!token || !isTokenValid()) {
+            console.log('🔑 No valid token found, authenticating...');
             token = await authenticate();
         }
+        
+        // Ensure we have a token
+        if (!token || !token.TokenId) {
+            throw new Error('No authentication token available');
+        }
 
-        // Determine the base URL based on the endpoint
-        const baseUrl = useBookingApi ? CONFIG.bookingApiUrl : CONFIG.flightApiUrl;
-        const url = `${baseUrl}${endpoint}`;
+        // Determine the endpoint URL
+        let apiUrl;
+        if (endpoint === '/Search') {
+            apiUrl = CONFIG.flightSearchUrl;
+        } else if (useBookingApi) {
+            apiUrl = `${CONFIG.baseUrl}${endpoint}`;
+        } else {
+            apiUrl = `${CONFIG.baseUrl}${endpoint}`;
+        }
 
         // Prepare request parameters
         const requestParams = {
             ...params,
-            TokenId: token.TokenId || token.access_token,
+            TokenId: token.TokenId,
             ClientId: CONFIG.clientId,
-            EndUserIp: getClientIp(req)
+            EndUserIp: CONFIG.vpsIp,
+            TraceId: traceId,
+            // Add any additional required parameters
+            LoginType: '1',
+            IsAgent: 'true'
         };
 
         // Log the request (without sensitive data)
@@ -222,69 +351,247 @@ const makeRequest = async (endpoint, params, req, useBookingApi = false) => {
         if (loggableParams.TokenId) {
             loggableParams.TokenId = '***' + loggableParams.TokenId.slice(-4);
         }
-        logMessage(`TBO API Request to ${url}: ${JSON.stringify(loggableParams, null, 2)}`);
+        if (loggableParams.Password) {
+            loggableParams.Password = '***';
+        }
 
-        console.log('Making API request to:', url);
-        console.log('Request params:', JSON.stringify({
-            ...requestParams,
-            TokenId: '***' + (requestParams.TokenId ? requestParams.TokenId.slice(-4) : '')
-        }, null, 2));
+        // Log the API call
+        if (CONFIG.debug) {
+            console.log(`🌐 [${traceId}] Making ${endpoint} request to:`, apiUrl);
+            console.log('📤 Request params:', JSON.stringify(loggableParams, null, 2));
+        }
+        
+        await logApiCall('REQUEST', {
+            traceId,
+            endpoint,
+            url: apiUrl,
+            method: 'POST',
+            request: loggableParams,
+            timestamp: new Date().toISOString()
+        });
 
         // Make the API request
-        const response = await axios({
-            method: 'post',
-            url,
-            data: requestParams,
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'Authorization': `Bearer ${token.TokenId || token.access_token}`
-            },
-            timeout: 45000, // 45 seconds timeout for TBO API
-            validateStatus: () => true // Always resolve to handle all status codes
-        });
+        try {
+            response = await axios({
+                method: 'post',
+                url: apiUrl,
+                data: requestParams,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'Authorization': `Bearer ${token.TokenId}`,
+                    'Trace-Id': traceId,
+                    'Client-Id': CONFIG.clientId,
+                    'User-Agent': 'GoingBo/1.0',
+                    'X-Forwarded-For': CONFIG.vpsIp,
+                    'X-API-Key': CONFIG.clientId,
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                responseType: 'json',
+                decompress: true,
+                timeout: CONFIG.timeout,
+                validateStatus: () => true, // Always resolve to handle all status codes
+                transformResponse: [function (data) {
+                    try {
+                        return typeof data === 'string' ? JSON.parse(data) : data;
+                    } catch (e) {
+                        return { raw: data };
+                    }
+                }]
+            });
+        } catch (error) {
+            // Handle network errors
+            if (error.code === 'ECONNABORTED') {
+                throw new Error(`Request timeout after ${CONFIG.timeout}ms`);
+            } else if (error.code === 'ENOTFOUND') {
+                throw new Error(`Could not connect to TBO API: ${error.hostname}`);
+            }
+            throw error;
+        }
 
-        console.log('API Response:', {
+        const durationMs = Date.now() - startTime;
+        const responseData = response.data || {};
+        
+        // Log the response
+        if (CONFIG.debug) {
+            console.log(`✅ [${traceId}] ${endpoint} completed in ${durationMs}ms`);
+            console.log(`📥 Response (${response.status}):`, 
+                JSON.stringify(responseData, null, 2).substring(0, 1000) + 
+                (JSON.stringify(responseData).length > 1000 ? '...' : ''));
+        }
+
+        // Log to file
+        await logApiCall('RESPONSE', {
+            traceId,
+            endpoint,
             status: response.status,
             statusText: response.statusText,
-            headers: response.headers,
-            data: response.data
+            response: responseData,
+            durationMs,
+            timestamp: new Date().toISOString()
         });
-
-        // Log the response
-        logMessage(`TBO API Response (${response.status}): ${JSON.stringify(response.data, null, 2)}`);
 
         // Check for HTTP errors
         if (response.status >= 400) {
-            const error = new Error(response.data?.Response?.Error?.ErrorMessage || 
-                                 response.data?.error?.message || 
-                                 `HTTP Error: ${response.status} ${response.statusText}`);
+            const errorMsg = responseData?.Response?.Error?.ErrorMessage || 
+                           responseData?.error?.message || 
+                           responseData?.Message ||
+                           `HTTP Error: ${response.status} ${response.statusText}`;
+            
+            const error = new Error(errorMsg);
             error.response = response;
             error.status = response.status;
+            error.code = responseData?.Response?.Error?.ErrorCode || 
+                        responseData?.error?.code ||
+                        'API_ERROR';
             throw error;
         }
 
         // Check for TBO-specific error in successful response
-        if (response.data && response.data.Response && response.data.Response.Error) {
-            const error = new Error(response.data.Response.Error.ErrorMessage || 'TBO API error');
-            error.response = response;
-            error.status = response.status;
-            throw error;
+        if (responseData && responseData.Response) {
+            // Check for error in response
+            if (responseData.Response.Error) {
+                const error = new Error(
+                    responseData.Response.Error.ErrorMessage || 
+                    responseData.Response.Error.Message || 
+                    'TBO API error'
+                );
+                error.response = response;
+                error.status = response.status;
+                error.code = responseData.Response.Error.ErrorCode || 'TBO_API_ERROR';
+                throw error;
+            }
+            
+            // Check for IsError flag in response
+            if (responseData.Response.IsError === true) {
+                const error = new Error(
+                    responseData.Response.ErrorMessage || 
+                    responseData.Response.Message || 
+                    'TBO API returned an error'
+                );
+                error.response = response;
+                error.status = response.status;
+                error.code = responseData.Response.ErrorCode || 'TBO_API_ERROR';
+                throw error;
+            }
+            
+            // Check for status in response
+            if (responseData.Response.Status !== 1 && responseData.Response.Status !== '1') {
+                const error = new Error(
+                    responseData.Response.ErrorMessage || 
+                    responseData.Response.Message || 
+                    `TBO API returned status: ${responseData.Response.Status}`
+                );
+                error.response = response;
+                error.status = response.status;
+                error.code = responseData.Response.ErrorCode || 'TBO_API_STATUS_ERROR';
+                throw error;
+            }
         }
 
-        return response.data;
+        return responseData;
     } catch (error) {
-        const errorMsg = `API Error (${endpoint}): ${error.message}\n${error.response?.data ? JSON.stringify(error.response.data) : ''}`;
-        logMessage(errorMsg);
-        console.error('❌', errorMsg);
+        const durationMs = Date.now() - startTime;
+        const errorResponse = error.response?.data || {};
+        const errorMessage = error.message || 'Unknown error';
+        const errorCode = error.code || error.status || 'UNKNOWN_ERROR';
+        
+        // Format error details
+        let errorDetails = {
+            message: errorMessage,
+            code: errorCode,
+            endpoint,
+            status: error.response?.status,
+            response: errorResponse,
+            stack: CONFIG.debug ? error.stack : undefined
+        };
+        
+        // Log the error
+        console.error(`❌ [${traceId}] ${endpoint} failed after ${durationMs}ms:`, 
+            JSON.stringify(errorDetails, null, 2));
+        
+        // Log to file
+        try {
+            await logApiCall('ERROR', {
+                traceId,
+                endpoint,
+                error: errorDetails,
+                durationMs,
+                timestamp: new Date().toISOString()
+            });
+        } catch (logError) {
+            console.error('Failed to log error:', logError);
+        }
 
-        // If unauthorized, try to refresh token once
-        if (error.response?.status === 401) {
-            token = null;
+        // Handle token expiration (401 Unauthorized)
+        if (error.response?.status === 401 || 
+            errorCode === 'UNAUTHORIZED' || 
+            errorMessage.toLowerCase().includes('token') ||
+            (errorResponse.Response?.Error?.ErrorCode === '040' || // Token expired
+             errorResponse.Response?.Error?.ErrorCode === '041')) { // Invalid token
+            
+            try {
+                console.log(`🔄 [${traceId}] Token expired or invalid, attempting to refresh...`);
+                
+                // Clear the current token
+                token = null;
+                
+                // Try to authenticate again
+                token = await authenticate();
+                
+                console.log(`🔄 [${traceId}] Token refreshed, retrying request...`);
+                
+                // Update the token in the params
+                const newParams = { ...params };
+                if (newParams.TokenId) newParams.TokenId = token.TokenId;
+                
+                // Retry the request with the new token
+                return makeRequest(endpoint, newParams, req, useBookingApi);
+                
+            } catch (refreshError) {
+                const refreshErrorMsg = `Failed to refresh token: ${refreshError.message}`;
+                console.error(`❌ [${traceId}] ${refreshErrorMsg}`);
+                
+                // If we can't refresh the token, clear it so we'll get a new one next time
+                token = null;
+                
+                throw new Error(`Authentication failed: ${refreshError.message}`);
+            }
+        }
+        
+        // Handle rate limiting (429 Too Many Requests)
+        if (error.response?.status === 429) {
+            const retryAfter = error.response.headers['retry-after'] || 5;
+            console.log(`⏳ [${traceId}] Rate limited, retrying after ${retryAfter} seconds...`);
+            
+            // Wait before retrying
+            await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+            
+            // Retry the request
             return makeRequest(endpoint, params, req, useBookingApi);
         }
-
-        throw new Error(`API request failed: ${error.message}`);
+        
+        // For other errors, include more context in the error message
+        const errorMsg = errorResponse?.Response?.Error?.ErrorMessage || 
+                        errorResponse?.error?.message || 
+                        errorMessage;
+        
+        const enhancedError = new Error(errorMsg);
+        enhancedError.originalError = error;
+        enhancedError.code = errorCode;
+        enhancedError.status = error.response?.status;
+        enhancedError.response = error.response;
+        
+        throw enhancedError;
+    } finally {
+        // Clean up expired trace IDs
+        const now = Date.now();
+        for (const [traceId, expiry] of activeTraces.entries()) {
+            if (expiry < now) {
+                activeTraces.delete(traceId);
+            }
+        }
     }
 };
 
@@ -294,131 +601,169 @@ const makeRequest = async (endpoint, params, req, useBookingApi = false) => {
 
 /**
  * Search for flights
+ * @param {Object} searchParams - Search parameters
+ * @param {Object} req - Express request object
+ * @returns {Promise<Object>} Search results
  */
-export const searchFlights = async (searchParams, req) => {
-    // Use VPS IP as the default IP
-    const clientIp = '82.112.236.83';
+export const searchFlights = async (searchParams = {}, req = {}) => {
+    const traceId = generateTraceId();
     
+    // Use mock data if enabled
     if (USE_MOCK) {
         console.log('🔍 Using mock flight search');
-        // Return mock flight data for testing
         return {
             success: true,
-            data: [
-                {
-                    id: 'FL123',
-                    airline: 'IndiGo',
-                    flightNumber: '6E-123',
-                    origin: searchParams.origin || 'DEL',
-                    destination: searchParams.destination || 'BOM',
-                    departureTime: '2024-12-15T08:00:00',
-                    arrivalTime: '2024-12-15T10:15:00',
-                    duration: '2h 15m',
-                    price: 4500,
-                    currency: 'INR',
-                    availableSeats: 5,
-                    sessionId: 'test-session-123',
-                    resultIndex: '1'
-                }
-            ]
+            data: [{
+                id: 'FL123',
+                airline: 'IndiGo',
+                flightNumber: '6E-123',
+                origin: searchParams.origin || 'DEL',
+                destination: searchParams.destination || 'BOM',
+                departureTime: '2024-12-15T08:00:00',
+                arrivalTime: '2024-12-15T10:15:00',
+                duration: '2h 15m',
+                price: 4500,
+                currency: 'INR',
+                availableSeats: 5,
+                sessionId: 'test-session-123',
+                resultIndex: '1'
+            }]
         };
     }
 
     try {
-        // Format search parameters according to TBO API requirements
+        // Validate required parameters
+        if (!searchParams.origin || !searchParams.destination || !searchParams.departureDate) {
+            throw new Error('Missing required search parameters: origin, destination, departureDate');
+        }
+
+        // Prepare search parameters for TBO API
         const tboSearchParams = {
-            EndUserIp: clientIp,
+            EndUserIp: CONFIG.vpsIp,
             TokenId: '', // Will be set in makeRequest
             AdultCount: parseInt(searchParams.adults) || 1,
             ChildCount: parseInt(searchParams.children) || 0,
             InfantCount: parseInt(searchParams.infants) || 0,
-            DirectFlight: searchParams.nonStop || false,
+            DirectFlight: Boolean(searchParams.nonStop),
             OneStopFlight: false,
-            JourneyType: searchParams.journeyType || '1', // 1 for OneWay, 2 for Return
+            JourneyType: searchParams.journeyType === 'roundtrip' ? '2' : '1',
             Segments: [
                 {
-                    Origin: searchParams.origin,
-                    Destination: searchParams.destination,
-                    FlightCabinClass: searchParams.cabinClass || '1', // 1: Economy, 2: Premium Economy, etc.
-                    PreferredDepartureTime: searchParams.departureDate,
+                    Origin: String(searchParams.origin).toUpperCase(),
+                    Destination: String(searchParams.destination).toUpperCase(),
+                    FlightCabinClass: searchParams.cabinClass || 'Economy',
+                    PreferredDepartureTime: formatDate(searchParams.departureDate),
                     PreferredArrivalTime: ''
                 }
             ],
             Sources: ['TBO'],
-            PreferredAirlines: [],
-            Currency: 'INR',
-            IsDomestic: true, // Set based on origin/destination if needed
-            IncludeAllFlightOptions: true
+            PreferredAirlines: searchParams.preferredAirlines || [],
+            Currency: searchParams.currency || 'INR',
+            IsDomestic: true,
+            IncludeAllFlightOptions: true,
+            IsRefundable: Boolean(searchParams.refundableOnly),
+            NoOfSeats: (parseInt(searchParams.adults) || 1) + (parseInt(searchParams.children) || 0),
+            TraceId: traceId
         };
 
         // Add return segment for round trips
-        if (searchParams.journeyType === '2' && searchParams.returnDate) {
+        if (searchParams.journeyType === 'roundtrip' && searchParams.returnDate) {
             tboSearchParams.Segments.push({
-                Origin: searchParams.destination,
-                Destination: searchParams.origin,
-                FlightCabinClass: searchParams.cabinClass || '1',
-                PreferredDepartureTime: searchParams.returnDate,
+                Origin: String(searchParams.destination).toUpperCase(),
+                Destination: String(searchParams.origin).toUpperCase(),
+                FlightCabinClass: searchParams.cabinClass || 'Economy',
+                PreferredDepartureTime: formatDate(searchParams.returnDate),
                 PreferredArrivalTime: ''
             });
         }
 
-        console.log('Sending search request to TBO:', JSON.stringify(tboSearchParams, null, 2));
+        if (CONFIG.debug) {
+            console.log(`✈️ [${traceId}] Flight search request:`, JSON.stringify(tboSearchParams, null, 2));
+        }
         
-        // Use the correct TBO API endpoint for flight search
+        // Make the API request
         const response = await makeRequest('/Search', tboSearchParams, req);
         
         // Process TBO API response
-        if (!response || !response.Response || !response.Response.Results) {
-            console.error('Invalid response format from TBO API:', response);
+        if (!response || !response.Response) {
             throw new Error('Invalid response format from TBO API');
         }
 
-        // Extract flight results
+        // Check for errors in response
+        if (response.Response.Error) {
+            throw new Error(response.Response.Error.ErrorMessage || 'Error in flight search');
+        }
+
+        if (!response.Response.Results || !Array.isArray(response.Response.Results)) {
+            throw new Error('No flight results found in response');
+        }
+
+        // Extract and format flight results
         const results = [];
         const segments = response.Response.Results[0]?.Segments || [];
+        const traceIdFromResponse = response.Response.TraceId || traceId;
         
-        segments.forEach((segment, index) => {
-            segment.Flights.forEach(flight => {
-                // Format flight duration
-                const durationInMinutes = flight.Duration || 0;
-                const hours = Math.floor(durationInMinutes / 60);
-                const minutes = durationInMinutes % 60;
-                const duration = `${hours}h ${minutes}m`;
+        segments.forEach((segment, segmentIndex) => {
+            if (!segment.Flights || !Array.isArray(segment.Flights)) return;
+            
+            segment.Flights.forEach((flight, flightIndex) => {
+                const flightId = `${flight.Airline?.FlightNumber || 'FLT'}-${segmentIndex}-${flightIndex}`;
+                const fare = flight.Fare || {};
+                const airline = flight.Airline || {};
+                const origin = flight.Origin || {};
+                const destination = flight.Destination || {};
                 
                 results.push({
-                    id: `${flight.Airline.FlightNumber}-${index}`,
-                    airline: flight.Airline.AirlineName || 'Unknown Airline',
-                    flightNumber: flight.Airline.FlightNumber || 'N/A',
-                    origin: flight.Origin?.AirportCode || searchParams.origin,
-                    destination: flight.Destination?.AirportCode || searchParams.destination,
-                    departureTime: flight.Origin?.DepTime || searchParams.departureDate,
-                    arrivalTime: flight.Destination?.ArrTime || '',
-                    duration: duration,
-                    price: flight.Fare?.PublishedFare || 0,
-                    currency: flight.Fare?.Currency || 'INR',
+                    id: flightId,
+                    airline: {
+                        code: airline.AirlineCode,
+                        name: airline.AirlineName,
+                        number: airline.FlightNumber,
+                        logo: airline.AirlineLogo
+                    },
+                    flightNumber: airline.FlightNumber,
+                    origin: {
+                        code: origin.AirportCode,
+                        name: origin.AirportName,
+                        city: origin.CityName,
+                        terminal: origin.Terminal,
+                        dateTime: origin.DepTime,
+                        date: origin.DepTime ? new Date(origin.DepTime).toISOString().split('T')[0] : ''
+                    },
+                    destination: {
+                        code: destination.AirportCode,
+                        name: destination.AirportName,
+                        city: destination.CityName,
+                        terminal: destination.Terminal,
+                        dateTime: destination.ArrTime,
+                        date: destination.ArrTime ? new Date(destination.ArrTime).toISOString().split('T')[0] : ''
+                    },
+                    departureTime: origin.DepTime,
+                    arrivalTime: destination.ArrTime,
+                    duration: flight.Duration || '',
+                    stops: parseInt(flight.NoOfStops) || 0,
+                    cabinClass: flight.CabinClass || searchParams.cabinClass || 'Economy',
+                    fare: {
+                        baseFare: fare.BaseFare || 0,
+                        tax: fare.Tax || 0,
+                        otherCharges: fare.OtherCharges || 0,
+                        discount: fare.Discount || 0,
+                        publishedFare: fare.PublishedFare || 0,
+                        currency: fare.Currency || 'INR',
+                        isRefundable: fare.IsRefundable || false,
+                        isLCC: fare.IsLCC || false
+                    },
                     availableSeats: flight.SeatsAvailable || 0,
-                    sessionId: response.Response.TraceId || 'N/A',
-                    resultIndex: index.toString(),
+                    bookingClass: flight.BookingClass || '',
+                    fareBasis: flight.FareBasis || '',
                     fareRules: flight.FareRules || {},
                     baggage: flight.Baggage || {},
-                    cabinClass: flight.CabinClass || searchParams.cabinClass || '1',
-                    // Additional flight details
-                    stops: segment.NoOfStops || 0,
-                    aircraftType: flight.AircraftType || 'N/A',
-                    airlineCode: flight.Airline.AirlineCode || 'N/A',
-                    // Add fare details if available
-                    fare: {
-                        baseFare: flight.Fare?.BaseFare || 0,
-                        tax: flight.Fare?.Tax || 0,
-                        totalFare: flight.Fare?.PublishedFare || 0,
-                        serviceFee: flight.Fare?.ServiceFee || 0
-                    },
-                    // Add segment details
-                    segment: {
-                        departureTerminal: flight.Origin?.AirportTerminal || 'N/A',
-                        arrivalTerminal: flight.Destination?.AirportTerminal || 'N/A',
-                        operatingAirline: flight.OperatingCarrier?.AirlineName || flight.Airline.AirlineName
-                    }
+                    amenities: flight.Amenities || {},
+                    sessionId: traceIdFromResponse,
+                    resultIndex: segmentIndex.toString(),
+                    isETicketEligible: flight.IsETicketEligible || false,
+                    isMealIncluded: flight.IsMealIncluded || false,
+                    isVisaRequired: flight.IsVisaRequired || false
                 });
             });
         });
@@ -426,32 +771,58 @@ export const searchFlights = async (searchParams, req) => {
         return {
             success: true,
             data: results,
-            traceId: response.Response.TraceId || 'N/A',
-            searchParams: searchParams
+            searchId: response.Response.SearchId,
+            traceId: traceIdFromResponse,
+            currency: tboSearchParams.Currency,
+            isDomestic: tboSearchParams.IsDomestic,
+            timestamp: new Date().toISOString()
         };
         
     } catch (error) {
-        console.error('Flight search error:', error);
+        console.error(`❌ [${traceId}] Flight search error:`, error);
         
-        // Extract error message from TBO response if available
-        let errorMessage = 'Failed to search for flights';
-        if (error.response?.data?.Response?.Error) {
-            errorMessage = error.response.data.Response.Error.ErrorMessage || errorMessage;
-        } else if (error.response?.data?.error) {
-            errorMessage = error.response.data.error.message || errorMessage;
-        } else if (error.message) {
-            errorMessage = error.message;
-        }
-        
-        return {
+        // Format error response
+        const errorResponse = {
             success: false,
             error: {
-                code: error.response?.data?.Response?.Error?.ErrorCode || 'SEARCH_ERROR',
-                message: errorMessage
-            }
+                code: error.code || 'SEARCH_ERROR',
+                message: error.message || 'Failed to search for flights',
+                details: error.response?.data || {},
+                status: error.status || 500
+            },
+            traceId,
+            timestamp: new Date().toISOString()
         };
+        
+        // Log the error
+        await logApiCall('FLIGHT_SEARCH_ERROR', {
+            traceId,
+            error: errorResponse.error,
+            searchParams,
+            timestamp: new Date().toISOString()
+        });
+        
+        return errorResponse;
     }
 };
+
+/**
+ * Format date for TBO API (YYYY-MM-DD)
+ * @param {string|Date} date - Date to format
+ * @returns {string} Formatted date string
+ */
+function formatDate(date) {
+    if (!date) return '';
+    
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return '';
+    
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}`;
+}
 
 /**
  * Get fare rules
