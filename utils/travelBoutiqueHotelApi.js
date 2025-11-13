@@ -20,13 +20,11 @@ if (!fs.existsSync(LOG_DIR)) {
 
 // TBO Hotel API Configuration
 const CONFIG = {
-    username: process.env.TBO_HOTEL_USERNAME || 'DELG738',
-    password: process.env.TBO_HOTEL_PASSWORD || 'Htl@DEL#38/G',
-    baseUrl: 'https://api.travelboutiqueonline.com',
-    hotelApiUrl: 'https://apiwr.tboholidays.com/HotelAPI',
-    bookingApiUrl: 'https://hotelbooking.travelboutiqueonline.com/HotelAPI_V10/HotelService.svc/rest',
+    username: 'DELG738',
+    password: 'Htl@DEL#38/G',
+    hotelApiUrl: 'https://affiliate.travelboutiqueonline.com/HotelAPI',
+    bookingApiUrl: 'https://affiliate.travelboutiqueonline.com/BookingAPI',
     logFile: path.join(LOG_DIR, `hotel_${new Date().toISOString().split('T')[0]}.log`),
-    auth: null,
     clientId: 'travelcategory',
     clientSecret: 'Tra@59334536'
 };
@@ -48,16 +46,15 @@ const logMessage = (message, type = 'info') => {
 };
 
 // Make authenticated request to TBO Hotel API
-const makeHotelRequest = async (endpoint, params = {}, method = 'post', isBookingApi = false, useClientAuth = false) => {
+const makeHotelRequest = async (endpoint, params = {}, method = 'post', isBookingApi = false) => {
     try {
         const baseUrl = isBookingApi ? CONFIG.bookingApiUrl : CONFIG.hotelApiUrl;
         const url = `${baseUrl}${endpoint}`;
-        const authString = 'Basic ' + Buffer.from('DELG738:Htl@DEL#38/G').toString('base64');
 
         const headers = {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'Authorization': authString
+            'Authorization': `Basic ${Buffer.from(`${CONFIG.username}:${CONFIG.password}`).toString('base64')}`
         };
         
         // Add request ID for tracking
@@ -109,7 +106,7 @@ export const fetchHotels = async (params) => {
     };
     
     const requestParams = { ...defaultParams, ...params };
-    return makeHotelRequest('/TBOHotelCodeList', requestParams, 'post', false, true);
+    return makeHotelRequest('/TBOHotelCodeList', requestParams, 'post', false);
 };
 
 /**
@@ -171,9 +168,8 @@ export const searchHotels = async (params) => {
         // Log the request for debugging
         console.log('Sending hotel search request with params:', JSON.stringify(requestParams, null, 2));
 
-        // Make the API request with authentication
-        // The makeHotelRequest function will handle the authentication via headers
-        const response = await makeHotelRequest('/Search', requestParams, 'post', false, false);
+        // Make the API request
+        const response = await makeHotelRequest('/Search', requestParams, 'post', false);
         
         // Check for error in response
         if (response.Status && response.Status.Code !== 200) {
