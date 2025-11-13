@@ -2,6 +2,7 @@ import axios from "axios";
 import fs from "fs";
 import path from "path";
 import { getAuthToken } from "./tboAuth.js";
+import { getCitiesByCountry as getTboCities } from "./tboCityApi.js";
 
 // =============================
 // CONFIGURATION
@@ -28,67 +29,14 @@ function log(message, data = null) {
     fs.appendFileSync(file, entry);
     console.log(message, data || "");
 }
+
 // ===========================================================
-// 🌍 GET CITIES BY COUNTRY (Using TBO's CityList API)
+// 🌍 GET CITIES BY COUNTRY (Delegates to tboCityApi)
 // ===========================================================
 export async function getCitiesByCountry(countryCode = "IN") {
     try {
-        const token = await getAuthToken();
-
-        // Using the correct endpoint for CityList
-        const url = `http://api.tbotechnology.in/TBOHolidays_HotelAPI/CityList`;
-
-        const requestBody = {
-            CountryCode: countryCode,
-            EndUserIp: CONFIG.endUserIp,
-            TokenId: token.TokenId
-        };
-
-        log(`🌍 Fetching cities for country ${countryCode}`, { url, requestBody });
-
-        const res = await axios.post(url, requestBody, {
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            timeout: CONFIG.timeout
-        });
-
-        log(`🌆 Cities API Response:`, {
-            status: res.status,
-            data: res.data
-        });
-
-        // Check if the response indicates success
-        if (res.data?.Status?.Code === 200) {
-            const cityList = res.data.CityList || [];
-            log(`✅ Found ${cityList.length} cities for ${countryCode}`);
-
-            return {
-                ResponseStatus: {
-                    Status: 'Success',
-                    Code: res.data.Status.Code,
-                    Description: res.data.Status.Description
-                },
-                CityList: cityList
-            };
-        }
-
-        // Handle error response
-        const errorMsg = res.data?.Status?.Description || 'Unknown error';
-        log(`❌ API Error: ${errorMsg}`);
-
-        return {
-            ResponseStatus: {
-                Status: 'Error',
-                Error: {
-                    ErrorMessage: errorMsg,
-                    Code: res.data?.Status?.Code
-                }
-            },
-            CityList: []
-        };
-
+        // Delegate to the dedicated city API module
+        return await getTboCities(countryCode);
     } catch (error) {
         log('❌ Error in getCitiesByCountry:', {
             message: error.message,
@@ -97,13 +45,15 @@ export async function getCitiesByCountry(countryCode = "IN") {
             stack: error.stack
         });
 
+        // Return error response in the expected format
         return {
             ResponseStatus: {
                 Status: 'Error',
                 Error: {
                     ErrorMessage: error.response?.data?.message ||
                         error.message ||
-                        'Failed to fetch cities from TBO API'
+                        'Failed to fetch cities from TBO API',
+                    Code: error.response?.status || 500
                 }
             },
             CityList: []
