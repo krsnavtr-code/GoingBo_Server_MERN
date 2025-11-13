@@ -52,9 +52,9 @@ export async function getCitiesByCountry(countryCode = "IN") {
 
         log("🌆 Raw city API response:", res.data);
 
-        if (res.data?.ResponseStatus?.Status === "Success" && res.data.DestinationCityList) {
-            log(`✅ Found ${res.data.DestinationCityList.length} cities`);
-            return res.data.DestinationCityList;
+        if (res.data?.ResponseStatus?.Status === "Success" && res.data.CityList) {
+            log(`✅ Found ${res.data.CityList.length} cities`);
+            return res.data.CityList;
         }
 
         log("⚠️ City list request failed or empty");
