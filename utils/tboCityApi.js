@@ -24,15 +24,19 @@ function log(message, data = null) {
 }
 
 export async function getCitiesByCountry(countryCode = "IN") {
-    const url = `${CITY_CONFIG.baseUrl}CityList`;
+    const url = `http://api.tbotechnology.in/TBOHolidays_HotelAPI/CityList`;
 
     try {
         log(`🌍 Fetching city list for ${countryCode}`, { url });
+
         const res = await axios.post(
             url,
             { CountryCode: countryCode },
             {
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": "Basic " + Buffer.from("travelcategory:Tra@59334536").toString("base64")
+                },
                 timeout: CITY_CONFIG.timeout
             }
         );
@@ -58,6 +62,7 @@ export async function getCitiesByCountry(countryCode = "IN") {
         };
     }
 }
+
 
 
 export default { getCitiesByCountry };
