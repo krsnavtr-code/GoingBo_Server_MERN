@@ -9,6 +9,7 @@ import { getAuthToken } from "./tboAuth.js";
 const CONFIG = {
     baseHotelUrl: "https://api.tektravels.com/HotelAPI_V7/",
     logDir: path.join(process.cwd(), "logs/TBO/hotels"),
+    endUserIp: "82.112.236.83", // Same as in tboAuth.js
     timeout: 20000
 };
 
@@ -30,19 +31,42 @@ function log(message, data = null) {
 // CITIES
 // =============================
 export async function getCitiesByCountry(countryCode = "IN") {
-    const token = await getAuthToken();
-    const body = { CountryCode: countryCode, EndUserIp: CONFIG.endUserIp, TokenId: token.TokenId };
-
     try {
-        const res = await axios.post(`${CONFIG.baseHotelUrl}GetDestinationCityList`, body, {
+        const token = await getAuthToken();
+        const body = { 
+            CountryCode: countryCode, 
+            EndUserIp: CONFIG.endUserIp, 
+            TokenId: token.TokenId 
+        };
+
+        log("🌍 Fetching cities for country:", countryCode);
+        const url = `${CONFIG.baseHotelUrl}GetDestinationCityList`;
+        log("Request URL:", url);
+        log("Request body:", body);
+
+        const res = await axios.post(url, body, {
             headers: { "Content-Type": "application/json" },
             timeout: CONFIG.timeout
         });
-        if (res.data?.ResponseStatus?.Status === "Success") return res.data.CityList;
-        log("⚠️ CityList failed", res.data);
+
+        log("Raw API response:", res.data);
+
+        if (res.data?.ResponseStatus?.Status === "Success" && res.data.CityList) {
+            log(`✅ Found ${res.data.CityList.length} cities`);
+            return res.data.CityList;
+        }
+        
+        log("⚠️ CityList request was not successful or returned no data");
+        if (res.data?.ResponseStatus) {
+            log("Error details:", res.data.ResponseStatus);
+        }
         return [];
     } catch (err) {
-        log("❌ CityList error", err.message);
+        log("❌ CityList error:", {
+            message: err.message,
+            response: err.response?.data,
+            stack: err.stack
+        });
         return [];
     }
 }
