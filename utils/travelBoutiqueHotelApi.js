@@ -42,7 +42,7 @@ export async function getCitiesByCountry(countryCode = "IN") {
         };
 
         // ✅ Updated endpoint (old one was 404)
-        const url = `${CONFIG.baseTboUrl}CityList`;
+        const url = `${CONFIG.baseTboUrl}DestinationCityList`;
         log("🌍 Fetching cities for country:", { url, body });
 
         const res = await axios.post(url, body, {
