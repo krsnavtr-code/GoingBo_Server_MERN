@@ -13,7 +13,7 @@ const CITY_CONFIG = {
     logDir: path.join(process.cwd(), "logs/TBO/cities"),
     tokenFile: path.join(process.cwd(), "logs/TBO/cities/token.json"),
     timeout: 20000,
-    baseUrl: "https://api.travelboutiqueonline.com/SharedAPI/SharedData.svc/rest/"
+    baseUrl: "https://api.tektravels.com/SharedServices/SharedData.svc/rest/"
 };
 
 // =============================
