@@ -56,7 +56,7 @@ const CONFIG = {
 const getAuthToken = async () => {
     try {
         // Select the right environment
-        const authUrl = `${CONFIG.sharedApiUrl}/Authenticate`;
+        const authUrl = 'https://api.tektravels.com/SharedServices/Authenticate';
 
         const requestBody = {
             ClientId: CONFIG.clientId,
