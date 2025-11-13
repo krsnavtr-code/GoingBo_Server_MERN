@@ -69,20 +69,24 @@ async function getCityApiToken() {
             timeout: CITY_CONFIG.timeout
         });
 
-        if (res.data?.TokenId) {
+        const tokenData = res.data?.TokenId || res.data?.AuthenticateResult?.TokenId;
+
+        if (tokenData) {
             fs.writeFileSync(
                 CITY_CONFIG.tokenFile,
-                JSON.stringify({ TokenId: res.data.TokenId, timestamp: new Date().toISOString() }, null, 2)
+                JSON.stringify({ TokenId: tokenData, timestamp: new Date().toISOString() }, null, 2)
             );
             log("✅ City API token obtained");
-            return res.data.TokenId;
+            return tokenData;
         }
 
+        log("🔍 Unexpected auth response format:", res.data);
         throw new Error("Invalid authentication response");
     } catch (err) {
         log("❌ Authentication failed:", err.message);
         throw err;
     }
+
 }
 
 // =============================
