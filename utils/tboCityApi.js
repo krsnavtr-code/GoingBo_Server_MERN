@@ -3,17 +3,17 @@ import fs from "fs";
 import path from "path";
 
 // =============================
-// CONFIGURATION - City API specific
+// CONFIGURATION
 // =============================
 const CITY_CONFIG = {
-    baseUrl: "http://api.tbotechnology.in/TBOHolidays_HotelAPI",
-    username: "DELG738", // Use appropriate credentials for city API
+    username: "DELG738",
     password: "Htl@DEL#38/G",
-    clientId: "tboprod",
+    clientId: "ApiIntegrationNew",
     endUserIp: "82.112.236.83",
     logDir: path.join(process.cwd(), "logs/TBO/cities"),
     tokenFile: path.join(process.cwd(), "logs/TBO/cities/token.json"),
-    timeout: 20000
+    timeout: 20000,
+    baseUrl: "https://api.tektravels.com/SharedServices/SharedData.svc/rest/"
 };
 
 // =============================
@@ -31,159 +31,101 @@ function log(message, data = null) {
 }
 
 // =============================
-// TOKEN HANDLING - Specific to City API
+// TOKEN HANDLING
 // =============================
 function loadCityToken() {
     if (fs.existsSync(CITY_CONFIG.tokenFile)) {
         try {
             const token = JSON.parse(fs.readFileSync(CITY_CONFIG.tokenFile, "utf8"));
-            // Check if token is still valid (e.g., not expired)
             const tokenAge = Date.now() - new Date(token.timestamp).getTime();
-            const maxTokenAge = 23 * 60 * 60 * 1000; // 23 hours in milliseconds
-            
-            if (tokenAge < maxTokenAge) {
-                log("✅ Using cached city API token");
+            const maxAge = 23 * 60 * 60 * 1000; // 23 hours
+            if (tokenAge < maxAge) {
+                log("✅ Using cached city token");
                 return token.TokenId;
             }
-        } catch (error) {
-            log("❌ Error loading city token:", error.message);
+        } catch (e) {
+            log("❌ Error reading cached token:", e.message);
         }
     }
     return null;
 }
 
 async function getCityApiToken() {
-    const cachedToken = loadCityToken();
-    if (cachedToken) return cachedToken;
+    const cached = loadCityToken();
+    if (cached) return cached;
+
+    const authUrl = `${CITY_CONFIG.baseUrl}Authenticate`;
+    const body = {
+        ClientId: CITY_CONFIG.clientId,
+        UserName: CITY_CONFIG.username,
+        Password: CITY_CONFIG.password,
+        EndUserIp: CITY_CONFIG.endUserIp
+    };
 
     try {
-        log("🔑 Requesting new city API token...");
-        
-        const authUrl = `http://api.tbotechnology.in/TBOHolidays_Authentication/Authenticate`;
-        const authBody = {
-            ClientId: CITY_CONFIG.clientId,
-            UserName: CITY_CONFIG.username,
-            Password: CITY_CONFIG.password,
-            EndUserIp: CITY_CONFIG.endUserIp
-        };
-
-        const response = await axios.post(authUrl, authBody, {
+        log("🔑 Authenticating for city API...");
+        const res = await axios.post(authUrl, body, {
             headers: { "Content-Type": "application/json" },
             timeout: CITY_CONFIG.timeout
         });
 
-        if (response.data?.TokenId) {
-            const tokenData = {
-                TokenId: response.data.TokenId,
-                timestamp: new Date().toISOString()
-            };
-            
-            // Save the token for future use
-            fs.writeFileSync(CITY_CONFIG.tokenFile, JSON.stringify(tokenData, null, 2));
-            log("✅ Successfully obtained new city API token");
-            return response.data.TokenId;
+        if (res.data?.TokenId) {
+            fs.writeFileSync(
+                CITY_CONFIG.tokenFile,
+                JSON.stringify({ TokenId: res.data.TokenId, timestamp: new Date().toISOString() }, null, 2)
+            );
+            log("✅ City API token obtained");
+            return res.data.TokenId;
         }
 
-        throw new Error("Failed to obtain city API token");
-    } catch (error) {
-        log("❌ City API authentication failed:", error.message);
-        throw error;
+        throw new Error("Invalid authentication response");
+    } catch (err) {
+        log("❌ Authentication failed:", err.message);
+        throw err;
     }
 }
 
-// ===========================================================
-// CITY API FUNCTIONS
-// ===========================================================
-
-/**
- * Get cities by country code
- * @param {string} countryCode - ISO country code (e.g., 'IN')
- * @returns {Promise<Object>} - Object containing city list and status
- */
+// =============================
+// GET CITIES
+// =============================
 export async function getCitiesByCountry(countryCode = "IN") {
     try {
         const token = await getCityApiToken();
-        const url = `${CITY_CONFIG.baseUrl}/CityList`;
-        
-        const requestBody = {
+
+        const url = `${CITY_CONFIG.baseUrl}GetDestinationCityList`;
+        const body = {
             CountryCode: countryCode,
             EndUserIp: CITY_CONFIG.endUserIp,
             TokenId: token
         };
 
-        log(`🌍 Fetching cities for country ${countryCode}`, { url });
-        
-        const response = await axios.post(url, requestBody, {
-            headers: { 
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
+        log(`🌍 Fetching city list for ${countryCode}`, { url });
+
+        const res = await axios.post(url, body, {
+            headers: { "Content-Type": "application/json" },
             timeout: CITY_CONFIG.timeout
         });
 
-        log(`🌆 Cities API Response Status: ${response.status}`);
-
-        // Check if the response indicates success
-        if (response.data?.Status?.Code === 200) {
-            const cityList = response.data.CityList || [];
-            log(`✅ Found ${cityList.length} cities for ${countryCode}`);
-            
+        if (res.data?.CityList) {
+            log(`✅ Found ${res.data.CityList.length} cities`);
             return {
-                ResponseStatus: { 
-                    Status: 'Success',
-                    Code: response.data.Status.Code,
-                    Description: response.data.Status.Description
-                },
-                CityList: cityList
+                ResponseStatus: { Status: "Success" },
+                CityList: res.data.CityList
             };
         }
 
-        // Handle error response
-        const errorMsg = response.data?.Status?.Description || 'Unknown error';
-        log(`❌ City API Error: ${errorMsg}`);
-        
-        // If token is invalid, clear it and retry once
-        if (response.data?.Status?.Code === 401) {
-            log("🔄 Invalid token, clearing cache and retrying...");
-            if (fs.existsSync(CITY_CONFIG.tokenFile)) {
-                fs.unlinkSync(CITY_CONFIG.tokenFile);
-            }
-            return getCitiesByCountry(countryCode);
-        }
-        
+        log("❌ Invalid city list response", res.data);
         return {
-            ResponseStatus: { 
-                Status: 'Error',
-                Error: { 
-                    ErrorMessage: errorMsg,
-                    Code: response.data?.Status?.Code
-                }
-            },
+            ResponseStatus: { Status: "Error", Error: { ErrorMessage: "Invalid response" } },
             CityList: []
         };
-        
-    } catch (error) {
-        log('❌ Error in getCitiesByCountry:', {
-            message: error.message,
-            code: error.code,
-            response: error.response?.data,
-            stack: error.stack
-        });
-        
+    } catch (err) {
+        log("❌ Error in getCitiesByCountry", err.message);
         return {
-            ResponseStatus: { 
-                Status: 'Error',
-                Error: { 
-                    ErrorMessage: error.response?.data?.message || 
-                                error.message || 
-                                'Failed to fetch cities from TBO API' 
-                }
-            },
+            ResponseStatus: { Status: "Error", Error: { ErrorMessage: err.message } },
             CityList: []
         };
     }
 }
 
-export default {
-    getCitiesByCountry
-};
+export default { getCitiesByCountry };
