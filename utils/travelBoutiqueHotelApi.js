@@ -55,8 +55,7 @@ const CONFIG = {
 // Get authentication token from TBO API
 const getAuthToken = async () => {
     try {
-        // Select the right environment
-        const authUrl = 'https://api.tektravels.com/SharedServices/Authenticate';
+        const authUrl = 'http://Sharedapi.tektravels.com/SharedData.svc/rest/Authenticate';
 
         const requestBody = {
             ClientId: CONFIG.clientId,
@@ -114,8 +113,6 @@ const getAuthToken = async () => {
         throw new Error(`Authentication request error: ${error.message}`);
     }
 };
-
-
 
 
 /**
