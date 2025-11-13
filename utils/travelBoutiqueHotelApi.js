@@ -7,9 +7,11 @@ import { getAuthToken } from "./tboAuth.js";
 // CONFIGURATION
 // =============================
 const CONFIG = {
-    baseHotelUrl: "https://api.tektravels.com/HotelAPI_V7/",
+    baseHotelUrl: "https://affiliate.travelboutiqueonline.com/HotelAPI/",
+    baseBookingUrl: "https://hotelbooking.travelboutiqueonline.com/HotelAPI_V10/HotelService.svc/rest/",
+    baseTboUrl: "https://apiwr.tboholidays.com/HotelAPI/",
     logDir: path.join(process.cwd(), "logs/TBO/hotels"),
-    endUserIp: "82.112.236.83", // Same as in tboAuth.js
+    endUserIp: "82.112.236.83",
     timeout: 20000
 };
 
@@ -27,36 +29,34 @@ function log(message, data = null) {
     console.log(message, data || "");
 }
 
-// =============================
-// CITIES
-// =============================
+// ===========================================================
+// 🌍 GET CITIES BY COUNTRY
+// ===========================================================
 export async function getCitiesByCountry(countryCode = "IN") {
     try {
         const token = await getAuthToken();
-        const body = { 
-            CountryCode: countryCode, 
-            EndUserIp: CONFIG.endUserIp, 
-            TokenId: token.TokenId 
+        const body = {
+            CountryCode: countryCode,
+            EndUserIp: CONFIG.endUserIp,
+            TokenId: token.TokenId
         };
 
-        log("🌍 Fetching cities for country:", countryCode);
         const url = `${CONFIG.baseHotelUrl}GetDestinationCityList`;
-        log("Request URL:", url);
-        log("Request body:", body);
+        log("🌍 Fetching cities for country:", { url, body });
 
         const res = await axios.post(url, body, {
             headers: { "Content-Type": "application/json" },
             timeout: CONFIG.timeout
         });
 
-        log("Raw API response:", res.data);
+        log("🌆 Raw city API response:", res.data);
 
         if (res.data?.ResponseStatus?.Status === "Success" && res.data.CityList) {
             log(`✅ Found ${res.data.CityList.length} cities`);
             return res.data.CityList;
         }
-        
-        log("⚠️ CityList request was not successful or returned no data");
+
+        log("⚠️ CityList request failed or empty");
         if (res.data?.ResponseStatus) {
             log("Error details:", res.data.ResponseStatus);
         }
@@ -71,116 +71,184 @@ export async function getCitiesByCountry(countryCode = "IN") {
     }
 }
 
-// =============================
-// HOTEL SEARCH
-// =============================
-export async function searchHotels(searchParams) {
-    const token = await getAuthToken();
-    const body = { ...searchParams, EndUserIp: CONFIG.endUserIp, TokenId: token.TokenId };
 
+// ===========================================================
+// 1️⃣ FETCH HOTELS LIST (TBOHotelCodeList)
+// ===========================================================
+export async function fetchHotels(params = {}) {
     try {
-        const res = await axios.post(`${CONFIG.baseHotelUrl}Search`, body, {
+        const token = await getAuthToken();
+        const body = {
+            CityCode: params.CityCode,
+            IsDetailedResponse: params.IsDetailedResponse || false,
+            EndUserIp: CONFIG.endUserIp,
+            TokenId: token.TokenId
+        };
+
+        const url = `${CONFIG.baseTboUrl}TBOHotelCodeList`;
+        log("📘 Fetching hotels list", { url, body });
+
+        const res = await axios.post(url, body, {
             headers: { "Content-Type": "application/json" },
             timeout: CONFIG.timeout
         });
+
+        log("✅ Hotel list response", res.data);
         return res.data;
     } catch (err) {
-        log("❌ Search error", err.message);
+        log("❌ Error fetching hotels", {
+            message: err.message,
+            response: err.response?.data
+        });
         throw err;
     }
 }
 
-// =============================
-// HOTEL DETAILS
-// =============================
-export async function getHotelDetails(params) {
-    const token = await getAuthToken();
-    const body = { ...params, EndUserIp: CONFIG.endUserIp, TokenId: token.TokenId };
-
+// ===========================================================
+// 2️⃣ FETCH HOTEL DETAILS (Hoteldetails)
+// ===========================================================
+export async function fetchHotelDetails(params = {}) {
     try {
-        const res = await axios.post(`${CONFIG.baseHotelUrl}HotelDetails`, body, {
+        const token = await getAuthToken();
+        const body = {
+            HotelCodes: params.HotelCodes, // comma-separated string
+            EndUserIp: CONFIG.endUserIp,
+            TokenId: token.TokenId
+        };
+
+        const url = `${CONFIG.baseTboUrl}Hoteldetails`;
+        log("🏨 Fetching hotel details", { url, body });
+
+        const res = await axios.post(url, body, {
             headers: { "Content-Type": "application/json" },
             timeout: CONFIG.timeout
         });
+
+        log("✅ Hotel details response", res.data);
         return res.data;
     } catch (err) {
-        log("❌ Hotel details error", err.message);
+        log("❌ Error fetching hotel details", {
+            message: err.message,
+            response: err.response?.data
+        });
         throw err;
     }
 }
 
-// =============================
-// PRE-BOOK
-// =============================
-export async function preBookHotel(params) {
-    const token = await getAuthToken();
-    const body = { ...params, EndUserIp: CONFIG.endUserIp, TokenId: token.TokenId };
-
+// ===========================================================
+// 3️⃣ SEARCH HOTELS (Search)
+// ===========================================================
+export async function search_hotels(searchParams = {}) {
     try {
-        const res = await axios.post(`${CONFIG.baseHotelUrl}PreBook`, body, {
+        const token = await getAuthToken();
+        const body = {
+            ...searchParams,
+            ResponseTime: searchParams.ResponseTime || 23.0,
+            IsDetailedResponse: searchParams.IsDetailedResponse || false,
+            EndUserIp: CONFIG.endUserIp,
+            TokenId: token.TokenId
+        };
+
+        const url = `${CONFIG.baseHotelUrl}Search`;
+        log("🔍 Searching hotels", { url, body });
+
+        const res = await axios.post(url, body, {
             headers: { "Content-Type": "application/json" },
             timeout: CONFIG.timeout
         });
+
+        log("✅ Search response", res.data);
         return res.data;
     } catch (err) {
-        log("❌ PreBook error", err.message);
+        log("❌ Hotel search error", {
+            message: err.message,
+            response: err.response?.data
+        });
         throw err;
     }
 }
 
-// =============================
-// BOOK
-// =============================
-export async function bookHotel(params) {
-    const token = await getAuthToken();
-    const body = { ...params, EndUserIp: CONFIG.endUserIp, TokenId: token.TokenId };
-
+// ===========================================================
+// 4️⃣ PRE-BOOK HOTEL (PreBook)
+// ===========================================================
+export async function fetchPreBook(params = {}) {
     try {
-        const res = await axios.post(`${CONFIG.baseHotelUrl}Book`, body, {
+        const token = await getAuthToken();
+        const body = { ...params, EndUserIp: CONFIG.endUserIp, TokenId: token.TokenId };
+
+        const url = `${CONFIG.baseHotelUrl}PreBook`;
+        log("🧾 Pre-book request", { url, body });
+
+        const res = await axios.post(url, body, {
             headers: { "Content-Type": "application/json" },
             timeout: CONFIG.timeout
         });
+
+        log("✅ Pre-book response", res.data);
         return res.data;
     } catch (err) {
-        log("❌ Booking error", err.message);
+        log("❌ Pre-book error", {
+            message: err.message,
+            response: err.response?.data
+        });
         throw err;
     }
 }
 
-// =============================
-// BOOKING DETAILS
-// =============================
-export async function getBookingDetails(bookingId) {
-    const token = await getAuthToken();
-    const body = { BookingId: bookingId, EndUserIp: CONFIG.endUserIp, TokenId: token.TokenId };
-
+// ===========================================================
+// 5️⃣ CONFIRM BOOKING (Book)
+// ===========================================================
+export async function confirm_ticket(params = {}) {
     try {
-        const res = await axios.post(`${CONFIG.baseHotelUrl}GetBookingDetail`, body, {
+        const token = await getAuthToken();
+        const body = { ...params, EndUserIp: CONFIG.endUserIp, TokenId: token.TokenId };
+
+        const url = `${CONFIG.baseBookingUrl}Book`;
+        log("🧾 Confirming booking", { url, body });
+
+        const res = await axios.post(url, body, {
             headers: { "Content-Type": "application/json" },
             timeout: CONFIG.timeout
         });
+
+        log("✅ Booking confirmation response", res.data);
         return res.data;
     } catch (err) {
-        log("❌ Booking details error", err.message);
+        log("❌ Booking confirmation error", {
+            message: err.message,
+            response: err.response?.data
+        });
         throw err;
     }
 }
 
-// =============================
-// HOTEL CODE LIST
-// =============================
-export async function getTBOHotelCodeList({ countryCode = "IN" }) {
-    const token = await getAuthToken();
-    const body = { CountryCode: countryCode, EndUserIp: CONFIG.endUserIp, TokenId: token.TokenId };
-
+// ===========================================================
+// 6️⃣ GET BOOKING DETAILS (GetBookingDetail)
+// ===========================================================
+export async function web_book_booking(bookingId) {
     try {
-        const res = await axios.post(`${CONFIG.baseHotelUrl}HotelCodeList`, body, {
+        const token = await getAuthToken();
+        const body = {
+            BookingId: bookingId,
+            EndUserIp: CONFIG.endUserIp,
+            TokenId: token.TokenId
+        };
+
+        const url = `${CONFIG.baseBookingUrl}GetBookingDetail`;
+        log("📜 Fetching booking details", { url, body });
+
+        const res = await axios.post(url, body, {
             headers: { "Content-Type": "application/json" },
             timeout: CONFIG.timeout
         });
-        return res.data?.Hotels || [];
+
+        log("✅ Booking details response", res.data);
+        return res.data;
     } catch (err) {
-        log("❌ HotelCodeList error", err.message);
+        log("❌ Booking details error", {
+            message: err.message,
+            response: err.response?.data
+        });
         throw err;
     }
 }
