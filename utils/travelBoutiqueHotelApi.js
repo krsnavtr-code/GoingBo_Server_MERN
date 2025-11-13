@@ -1,7 +1,7 @@
 import axios from "axios";
 import fs from "fs";
 import path from "path";
-import { getAuthToken } from "./tboAuth";
+import { getAuthToken } from "./tboAuth.js";
 
 // =============================
 // CONFIGURATION
