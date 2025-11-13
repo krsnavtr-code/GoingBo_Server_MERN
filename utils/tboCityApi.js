@@ -2,13 +2,12 @@ import axios from "axios";
 import fs from "fs";
 import path from "path";
 
+import tboAuth from "./tboAuth";
+
 const CITY_CONFIG = {
     baseUrl: "https://api.travelboutiqueonline.com/SharedAPI/SharedData.svc/rest/",
     logDir: path.join(process.cwd(), "logs/TBO/cities"),
     timeout: 20000,
-    username: "DELG738",
-    password: "Htl@DEL#38/G",
-    clientId: "ApiIntegrationNew",
     endUserIp: "82.112.236.83"
 };
 
@@ -27,35 +26,13 @@ function log(message, data = null) {
     console.log(message, data || "");
 }
 
-async function getAuthToken() {
-    const url = `${CITY_CONFIG.baseUrl}Authenticate`;
-    const body = {
-        ClientId: CITY_CONFIG.clientId,
-        UserName: CITY_CONFIG.username,
-        Password: CITY_CONFIG.password,
-        EndUserIp: CITY_CONFIG.endUserIp
-    };
-
-    try {
-        log("🔑 Authenticating with TBO API...");
-        const res = await axios.post(url, body, {
-            headers: { "Content-Type": "application/json" },
-            timeout: CITY_CONFIG.timeout
-        });
-
-        if (res.data?.TokenId) {
-            return res.data.TokenId;
-        }
-        throw new Error("Invalid authentication response");
-    } catch (err) {
-        log("❌ Authentication failed:", err.message);
-        throw err;
-    }
-}
-
 export async function getCitiesByCountry(countryCode = "IN") {
     try {
-        const token = await getAuthToken();
+        // Use the existing authentication from tboAuth
+        const { TokenId: token } = await tboAuth.getAuthToken();
+        if (!token) {
+            throw new Error("Failed to get authentication token");
+        }
         const url = `${CITY_CONFIG.baseUrl}GetDestinationCityList`;
         
         log(`🌍 Fetching city list for ${countryCode}`, { url });
