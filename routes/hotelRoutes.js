@@ -5,7 +5,8 @@ import {
     preBook,
     book,
     getBooking,
-    getHotelCodes
+    getHotelCodes,
+    searchCities
 } from '../controllers/hotelController.js';
 
 const router = express.Router();
@@ -27,6 +28,9 @@ router.get('/booking/:bookingId', getBooking);
 
 // Search hotel codes
 router.get('/hotel-codes', getHotelCodes);
+
+// Search cities
+router.get('/search-cities', searchCities);
 
 // Register a new hotel
 // router.post('/register', register);

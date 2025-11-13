@@ -4,64 +4,95 @@ import {
     preBookHotel,
     bookHotel,
     getBookingDetails,
-    getHotelCodeList
+    getHotelCodeList,
+    getCitiesByCountry
 } from '../utils/travelBoutiqueHotelApi.js';
 import Hotel from '../models/Hotel.js';
 
 // Search hotels
 export const search = async (req, res) => {
     try {
-        const { checkIn, checkOut, city, country, guests, rooms, hotelCodes } = req.body;
+        const { checkIn, checkOut, city, country = 'IN', guests = {}, rooms = 1, hotelCodes = [] } = req.body;
 
-        // Process guests into room configuration
-        const roomGuests = [];
-        let guestIndex = 0;
-
-        for (let i = 0; i < rooms; i++) {
-            const room = {
-                Adults: 0,
-                Children: 0,
-                ChildrenAges: []
-            };
-
-            // Add adults
-            for (let j = 0; j < guests.adults; j++) {
-                if (guestIndex < guests.adults) {
-                    room.Adults++;
-                    guestIndex++;
-                }
-            }
-
-            // Add children
-            for (let j = 0; j < guests.children; j++) {
-                if (j < guests.childrenAges.length) {
-                    room.Children++;
-                    room.ChildrenAges.push(parseInt(guests.childrenAges[j]));
-                }
-            }
-
-            roomGuests.push(room);
+        // Validate required fields
+        if (!checkIn || !checkOut) {
+            return res.status(400).json({
+                success: false,
+                message: 'Check-in and check-out dates are required'
+            });
         }
 
+        if (!city) {
+            return res.status(400).json({
+                success: false,
+                message: 'City is required'
+            });
+        }
+
+        // Set default values if not provided
+        const adults = parseInt(guests.adults) || 1;
+        const children = parseInt(guests.children) || 0;
+        const childrenAges = Array.isArray(guests.childrenAges) 
+            ? guests.childrenAges.map(age => parseInt(age) || 0).filter(age => age > 0)
+            : [];
+
+        // First, search for city ID if city is not a number
+        let cityId = city;
+        if (isNaN(Number(city))) {
+            try {
+                const cities = await getCitiesByCountry(country);
+                const matchedCity = cities.find(c => 
+                    c.CityName.toLowerCase() === city.toLowerCase() || 
+                    c.CityCode === city
+                );
+                
+                if (!matchedCity) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'City not found. Please select a valid city from the dropdown.'
+                    });
+                }
+                cityId = matchedCity.CityId;
+            } catch (error) {
+                console.error('Error fetching cities:', error);
+                return res.status(500).json({
+                    success: false,
+                    message: 'Error looking up city information',
+                    error: error.message
+                });
+            }
+        }
+
+        // Create room configuration
+        const paxRooms = [{
+            Adults: adults,
+            Children: children,
+            ChildrenAges: childrenAges,
+            RoomNo: 1
+        }];
+
+        // Prepare search parameters
         const searchParams = {
             CheckIn: checkIn,
             CheckOut: checkOut,
-            CityId: city,
+            CityId: cityId,
             CountryCode: country,
             GuestNationality: 'IN',
-            PaxRooms: roomGuests,
+            PaxRooms: paxRooms,
             ResponseTime: 23.0,
             IsDetailedResponse: true,
-            HotelCodes: hotelCodes || [],
+            HotelCodes: Array.isArray(hotelCodes) ? hotelCodes : [],
             Filters: {
                 Refundable: false,
-                NoOfRooms: rooms,
+                NoOfRooms: parseInt(rooms) || 1,
                 MealType: 0,
                 OrderBy: 0,
                 StarRating: 0
             }
         };
 
+        console.log('Searching hotels with params:', JSON.stringify(searchParams, null, 2));
+        
         const result = await searchHotels(searchParams);
         res.json(result);
     } catch (error) {
@@ -148,16 +179,74 @@ export const getBooking = async (req, res) => {
 // Get hotel codes
 export const getHotelCodes = async (req, res) => {
     try {
-        const { searchQuery } = req.query;
-        const result = await getHotelCodeList({
-            SearchQuery: searchQuery
+        const { countryCode = 'IN' } = req.query;
+        const result = await getHotelCodeList({ countryCode });
+        res.json({
+            success: true,
+            data: result
         });
-        res.json(result);
     } catch (error) {
         console.error('Get hotel codes error:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to get hotel codes',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Search for cities by name or code
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+export const searchCities = async (req, res) => {
+    try {
+        const { query = '', countryCode = 'IN' } = req.query;
+
+        if (!query || query.length < 2) {
+            return res.json({
+                success: true,
+                data: []
+            });
+        }
+
+        // Get all cities for the country
+        const response = await getCitiesByCountry(countryCode);
+
+        // Check if response has data property and it's an array
+        const cities = response && Array.isArray(response.data) ? response.data : [];
+
+        // Filter cities based on the search query
+        const searchTerm = query.toLowerCase();
+        const filteredCities = cities.filter(city => {
+            if (!city) return false;
+            
+            const cityName = city.Name || '';
+            const cityCode = city.Code || '';
+            
+            return (
+                cityName.toLowerCase().includes(searchTerm) ||
+                cityCode.toLowerCase().includes(searchTerm)
+            );
+        });
+        
+        // Transform the data to match the expected format
+        const transformedCities = filteredCities.map(city => ({
+            CityId: city.Code,
+            CityName: city.Name.split(',')[0].trim(), // Get just the city name part
+            CountryName: 'India' // Default to India for now
+        }));
+
+        res.json({
+            success: true,
+            data: transformedCities
+        });
+    } catch (error) {
+        console.error('Search cities error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to search cities',
             error: error.message
         });
     }

@@ -117,17 +117,69 @@ export const fetchHotels = async (params) => {
  * @param {Object} params - Search parameters
  * @returns {Promise<Object>} Search results
  */
+/**
+ * Search hotels with the given parameters
+ * @param {Object} params - Search parameters
+ * @param {string} params.CityId - City ID to search in
+ * @param {string} params.CheckIn - Check-in date (YYYY-MM-DD)
+ * @param {string} params.CheckOut - Check-out date (YYYY-MM-DD)
+ * @param {Array} params.PaxRooms - Array of room configurations
+ * @param {number} [params.ResponseTime=23.0] - Response time limit
+ * @param {boolean} [params.IsDetailedResponse=true] - Whether to include detailed response
+ * @param {string} [params.GuestNationality='IN'] - Guest nationality code
+ * @param {Array} [params.HotelCodes=[]] - Specific hotel codes to search for
+ * @returns {Promise<Object>} Search results
+ */
 export const searchHotels = async (params) => {
-    // Add default parameters
-    const defaultParams = {
-        ResponseTime: 23.0,
-        IsDetailedResponse: true,
-        GuestNationality: 'IN',
-        TokenId: process.env.TBO_AUTH_TOKEN || ''
-    };
-    
-    const requestParams = { ...defaultParams, ...params };
-    return makeHotelRequest('/Search', requestParams, 'post', false, true);
+    try {
+        // Validate required parameters
+        if (!params.CityId) {
+            throw new Error('CityId is required');
+        }
+        if (!params.CheckIn) {
+            throw new Error('CheckIn date is required');
+        }
+        if (!params.CheckOut) {
+            throw new Error('CheckOut date is required');
+        }
+        if (!params.PaxRooms || params.PaxRooms.length === 0) {
+            throw new Error('At least one room configuration is required');
+        }
+
+        // Set default parameters
+        const defaultParams = {
+            ResponseTime: 23.0,
+            IsDetailedResponse: true,
+            GuestNationality: 'IN',
+            TokenId: process.env.TBO_AUTH_TOKEN || '',
+            HotelCodes: [],
+            Filters: {
+                Refundable: false,
+                MealType: 0,
+                OrderBy: 0,
+                StarRating: 0
+            }
+        };
+
+        // Merge parameters
+        const requestParams = { ...defaultParams, ...params };
+
+        // Log the request for debugging
+        console.log('Sending hotel search request with params:', JSON.stringify(requestParams, null, 2));
+
+        // Make the API request
+        const response = await makeHotelRequest('/Search', requestParams, 'post', false, true);
+        
+        // Check for error in response
+        if (response.Status && response.Status.Code !== 200) {
+            throw new Error(response.Status.Description || 'Failed to search hotels');
+        }
+        
+        return response;
+    } catch (error) {
+        console.error('Error in searchHotels:', error);
+        throw error;
+    }
 };
 
 /**
