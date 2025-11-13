@@ -22,16 +22,10 @@ if (!fs.existsSync(LOG_DIR)) {
 const CONFIG = {
     username: 'DELG738',
     password: 'Htl@DEL#38/G',
-    hotelApiUrl: 'https://affiliate.travelboutiqueonline.com/HotelAPI',
-    bookingApiUrl: 'https://affiliate.travelboutiqueonline.com/BookingAPI',
+    clientId: 'ApiIntegrationNew',
+    baseUrl: 'https://api.tektravels.com',
     logFile: path.join(LOG_DIR, `hotel_${new Date().toISOString().split('T')[0]}.log`),
-    clientId: 'travelcategory',
-    clientSecret: 'Tra@59334536'
-};
-
-// Generate basic auth token
-const getAuthToken = () => {
-    return Buffer.from(`${CONFIG.username}:${CONFIG.password}`).toString('base64');
+    endUserIp: '82.112.236.83'
 };
 
 // Log messages to file
@@ -45,16 +39,70 @@ const logMessage = (message, type = 'info') => {
     }
 };
 
-// Make authenticated request to TBO Hotel API
-const makeHotelRequest = async (endpoint, params = {}, method = 'post', isBookingApi = false) => {
+// Get authentication token from TBO API
+const getAuthToken = async () => {
     try {
-        const baseUrl = isBookingApi ? CONFIG.bookingApiUrl : CONFIG.hotelApiUrl;
-        const url = `${baseUrl}${endpoint}`;
+        const authUrl = `${CONFIG.baseUrl}/SharedServices/Authentication/Authenticate`;
+        const requestBody = {
+            ClientId: CONFIG.clientId,
+            UserName: CONFIG.username,
+            Password: CONFIG.password,
+            EndUserIp: CONFIG.endUserIp
+        };
+
+        console.log('Authentication request:', {
+            url: authUrl,
+            requestBody: { ...requestBody, Password: '***' } // Don't log actual password
+        });
+
+        const response = await axios.post(
+            "https://api.tektravels.com/SharedServices/Authentication/Authenticate",
+            requestBody,
+            { headers: { "Content-Type": "application/json" } }
+        );
+        
+        console.log(response.data);
+
+        if (response.data && response.data.TokenId) {
+            return response.data.TokenId;
+        }
+
+        throw new Error(`Authentication failed: ${JSON.stringify(response.data || 'No token in response')}`);
+    } catch (error) {
+        const errorDetails = {
+            message: error.message,
+            code: error.code,
+            status: error.response?.status,
+            statusText: error.response?.statusText,
+            responseData: error.response?.data
+        };
+        
+        console.error('Authentication error details:', JSON.stringify(errorDetails, null, 2));
+        
+        if (error.response) {
+            // The request was made and the server responded with a status code
+            // that falls out of the range of 2xx
+            throw new Error(`Authentication failed with status ${error.response.status}: ${error.response.statusText}`);
+        } else if (error.request) {
+            // The request was made but no response was received
+            throw new Error('No response received from authentication server');
+        } else {
+            // Something happened in setting up the request that triggered an Error
+            throw new Error(`Authentication request error: ${error.message}`);
+        }
+    }
+};
+
+// Make authenticated request to TBO Hotel API
+const makeHotelRequest = async (endpoint, params = {}, method = 'post') => {
+    try {
+        const token = await getAuthToken();
+        const url = `${CONFIG.baseUrl}${endpoint}`;
 
         const headers = {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'Authorization': `Basic ${Buffer.from(`${CONFIG.username}:${CONFIG.password}`).toString('base64')}`
+            'Token': token
         };
         
         // Add request ID for tracking
@@ -246,11 +294,21 @@ export const getCountries = async () => {
  */
 export const getCitiesByCountry = async (countryCode) => {
     try {
-        const response = await makeHotelRequest('/CityList', { CountryCode: countryCode }, 'post', false, true);
+        const response = await makeHotelRequest(
+            '/SharedServices/StaticData.svc/GetCityList',
+            {
+                CountryCode: countryCode,
+                ClientId: CONFIG.clientId,
+                UserName: CONFIG.username,
+                Password: CONFIG.password,
+                EndUserIp: CONFIG.endUserIp
+            },
+            'post'
+        );
         
-        // The API returns the city list in the response.CityList property
-        if (response && response.CityList) {
-            return response;
+        // The API returns the city list in the response.GetCityListResult.CityList property
+        if (response && response.GetCityListResult && response.GetCityListResult.CityList) {
+            return { CityList: response.GetCityListResult.CityList };
         }
         
         // If the response doesn't have the expected structure, log it and return an empty array
