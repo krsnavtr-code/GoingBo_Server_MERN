@@ -1,10 +1,4 @@
 import {
-    searchHotels,
-    getHotelDetails,
-    preBookHotel,
-    bookHotel,
-    getBookingDetails,
-    getTBOHotelCodeList,
     getCitiesByCountry
 } from '../utils/travelBoutiqueHotelApi.js';
 import Hotel from '../models/Hotel.js';
