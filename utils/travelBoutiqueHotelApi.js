@@ -134,7 +134,7 @@ const CONFIG = {
     // TBO API credentials
     username: 'DELG738',
     password: 'Htl@DEL#38/G',
-    clientId: 'ApiIntegration',
+    clientId: 'ApiIntegrationNew',
     
     // API endpoints
     baseUrl: 'https://api.tbotechnology.in',
@@ -158,10 +158,9 @@ const CONFIG = {
 // Get authentication token from TBO API
 const getAuthToken = async () => {
     try {
-        // const authUrl = `https://api.tektravels.com/SharedServices/SharedData.svc/Authenticate`;
-        const authUrl = `https://api.tbotechnology.in/SharedServices/SharedData.svc/Authenticate`;
+        const authUrl = `https://api.tbotechnology.in/SharedServices/Authentication/Authenticate`;
         const requestBody = {
-            "ClientId": "ApiIntegration",
+            "ClientId": "ApiIntegrationNew",
             "UserName": "DELG738",
             "Password": "Htl@DEL#38/G",
             "EndUserIp": "82.112.236.83"
