@@ -55,13 +55,10 @@ const CONFIG = {
 // Get authentication token from TBO API
 const getAuthToken = async () => {
     try {
-        // Decide environment dynamically
-        const isProd = CONFIG.baseUrl.includes('tektravels.com');
-
-        // Correct base URL for each environment
-        const authUrl = isProd
-            ? 'https://api.tektravels.com/SharedServices/Authentication/Authenticate'
-            : 'https://api.tbotechnology.in/SharedServices/SharedData.svc/rest/Authenticate';
+        // Select the right environment
+        const authUrl = CONFIG.baseUrl.includes('tbotechnology.in')
+            ? 'https://api.tbotechnology.in/SharedServices/Authentication/Authenticate'
+            : 'https://api.tektravels.com/SharedServices/Authentication/Authenticate';
 
         const requestBody = {
             ClientId: CONFIG.clientId,
@@ -89,42 +86,37 @@ const getAuthToken = async () => {
             data: response.data
         });
 
-        // Parse both text and JSON responses
-        let data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
-
-        if (data?.TokenId) {
+        if (response.data?.TokenId) {
             authState = {
-                tokenId: data.TokenId,
-                tokenAgencyId: data.Member?.AgencyId,
-                tokenMemberId: data.Member?.MemberId
+                tokenId: response.data.TokenId,
+                tokenAgencyId: response.data.Member?.AgencyId,
+                tokenMemberId: response.data.Member?.MemberId
             };
-            console.log('✅ Authentication successful:', authState);
-            return data.TokenId;
+            console.log('✅ Auth successful:', authState);
+            return response.data.TokenId;
         }
 
-        const errorMessage = data?.Error?.ErrorMessage || 'Authentication failed';
-        console.error('Authentication failed:', errorMessage);
-        throw new Error(errorMessage);
+        const errMsg = response.data?.Error?.ErrorMessage || 'Authentication failed';
+        throw new Error(errMsg);
 
     } catch (error) {
-        const errorDetails = {
+        const details = {
             message: error.message,
             code: error.code,
             status: error.response?.status,
             statusText: error.response?.statusText,
             responseData: error.response?.data
         };
-        console.error('Authentication error details:', JSON.stringify(errorDetails, null, 2));
+        console.error('Authentication error details:', JSON.stringify(details, null, 2));
 
-        if (error.response) {
+        if (error.response)
             throw new Error(`Authentication failed with status ${error.response.status}: ${error.response.statusText}`);
-        } else if (error.request) {
-            throw new Error('No response received from authentication server');
-        } else {
-            throw new Error(`Authentication request error: ${error.message}`);
-        }
+        if (error.request)
+            throw new Error('No response from authentication server');
+        throw new Error(`Authentication request error: ${error.message}`);
     }
 };
+
 
 
 
