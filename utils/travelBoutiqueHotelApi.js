@@ -52,12 +52,12 @@ const makeHotelRequest = async (endpoint, params = {}, method = 'post', isBookin
     try {
         const baseUrl = isBookingApi ? CONFIG.bookingApiUrl : CONFIG.hotelApiUrl;
         const url = `${baseUrl}${endpoint}`;
+        const authString = 'Basic ' + Buffer.from('DELG738:Htl@DEL#38/G').toString('base64');
 
         const headers = {
             'Content-Type': 'application/json',
-            'Authorization': useClientAuth 
-                ? `Basic ${Buffer.from(`${CONFIG.clientId}:${CONFIG.clientSecret}`).toString('base64')}`
-                : `Basic ${getAuthToken()}`
+            'Accept': 'application/json',
+            'Authorization': authString
         };
         
         // Add request ID for tracking
