@@ -24,11 +24,18 @@ function log(message, data = null) {
 }
 
 export async function getCitiesByCountry(countryCode = "IN") {
-    const url = `${CITY_CONFIG.baseUrl}CityList/${countryCode}`;
+    const url = `${CITY_CONFIG.baseUrl}CityList`;
 
     try {
         log(`🌍 Fetching city list for ${countryCode}`, { url });
-        const res = await axios.get(url, { timeout: CITY_CONFIG.timeout });
+        const res = await axios.post(
+            url,
+            { CountryCode: countryCode },
+            {
+                headers: { "Content-Type": "application/json" },
+                timeout: CITY_CONFIG.timeout
+            }
+        );
 
         if (res.data?.CityList?.length) {
             log(`✅ Found ${res.data.CityList.length} cities`);
@@ -51,5 +58,6 @@ export async function getCitiesByCountry(countryCode = "IN") {
         };
     }
 }
+
 
 export default { getCitiesByCountry };
