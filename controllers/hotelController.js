@@ -4,7 +4,7 @@ import {
     preBookHotel,
     bookHotel,
     getBookingDetails,
-    getHotelCodeList,
+    getTBOHotelCodeList,
     getCitiesByCountry
 } from '../utils/travelBoutiqueHotelApi.js';
 import Hotel from '../models/Hotel.js';
@@ -180,7 +180,7 @@ export const getBooking = async (req, res) => {
 export const getHotelCodes = async (req, res) => {
     try {
         const { countryCode = 'IN' } = req.query;
-        const result = await getHotelCodeList({ countryCode });
+        const result = await getTBOHotelCodeList({ countryCode });
         res.json({
             success: true,
             data: result
