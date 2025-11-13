@@ -9,8 +9,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Create necessary directories
-const TOKEN_DIR = path.join(__dirname, '../data/tokens/TBO');
-const LOG_DIR = path.join(__dirname, '../logs/TBO/flights');
+const BASE_DIR = path.resolve(process.cwd(), 'data/tokens/TBO');
+const TOKEN_DIR = path.join(BASE_DIR, 'tokens');
+const LOG_DIR = path.join(BASE_DIR, 'logs');
 
 [TOKEN_DIR, LOG_DIR].forEach(dir => {
     if (!fs.existsSync(dir)) {
@@ -29,12 +30,12 @@ const CONFIG = {
     password: process.env.TRAVEL_BOUTIQUE_PASSWORD || 'Htl@DEL#38/G',
     
     // API Endpoints
-    baseUrl: process.env.TRAVEL_BOUTIQUE_API_URL || 'https://api.tektravels.com/SharedAPI/SharedData.svc/rest',
-    flightBaseUrl: process.env.TRAVEL_BOUTIQUE_FLIGHT_API_URL || 'https://api.tektravels.com/SharedAPI/SharedData.svc/rest',
-    bookingBaseUrl: process.env.TRAVEL_BOUTIQUE_BOOKING_API_URL || 'https://api.tektravels.com/Booking/Service.svc/rest',
+    baseUrl: process.env.TRAVEL_BOUTIQUE_API_URL || 'https://api.travelboutiqueonline.com',
+    flightBaseUrl: process.env.TRAVEL_BOUTIQUE_FLIGHT_API_URL || 'https://api.travelboutiqueonline.com',
+    bookingBaseUrl: process.env.TRAVEL_BOUTIQUE_BOOKING_API_URL || 'https://api.travelboutiqueonline.com',
     
     // Endpoints
-    authUrl: '/authenticate',
+    authUrl: 'https://api.travelboutiqueonline.com/SharedAPI/SharedService.svc/rest/GetToken',
     flightSearchUrl: '/Search',
     
     // File paths
@@ -85,7 +86,7 @@ const logApiCall = async (type, data) => {
             : [];
         
         logData.push(logEntry);
-        await fs.promises.writeFile(CONFIG.logFile, JSON.stringify(logData, null, 2));
+        await fs.promises.appendFile(CONFIG.logFile, JSON.stringify(logEntry) + '\n');
         
         return logEntry;
     } catch (error) {
@@ -148,9 +149,8 @@ const restoreToken = () => {
  */
 const isTokenValid = (tokenToCheck = token) => {
     if (!tokenToCheck || !tokenToCheck.date) return false;
-    const tokenAge = Date.now() - tokenToCheck.date;
-    // Consider token expired if it's older than (expires_in - 60) seconds
-    return tokenAge < ((tokenToCheck.expires_in - 60) * 1000);
+    const expiresAt = tokenToCheck.expires_at || (tokenToCheck.date + tokenToCheck.expires_in * 1000);
+    return Date.now() < expiresAt - 60000;
 };
 
 /**
@@ -186,9 +186,8 @@ async function authenticate() {
                 data: {
                     ClientId: CONFIG.clientId,
                     UserName: CONFIG.username,
-                    Password: '***',
-                    EndUserIp: CONFIG.vpsIp,
-                    LoginType: '1'
+                    Password: CONFIG.password,
+                    EndUserIp: CONFIG.vpsIp
                 }
             });
         }
@@ -197,12 +196,17 @@ async function authenticate() {
         const response = await axios({
             method: 'post',
             url: CONFIG.authUrl,
-            data: authData.toString(),
+            data: {
+                client_id: CONFIG.clientId,
+                client_secret: CONFIG.password,
+                grant_type: 'client_credentials'
+            },
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Type': 'application/json',
                 'Accept': 'application/json',
                 'Accept-Encoding': 'gzip, deflate, br',
-                'User-Agent': 'GoingBo/1.0'
+                'User-Agent': 'GoingBo/1.0',
+                'api-key': CONFIG.clientId
             },
             timeout: CONFIG.timeout,
             // Handle different response formats
@@ -224,14 +228,25 @@ async function authenticate() {
             });
         }
 
+        // Log the raw response for debugging
+        console.log('🔑 Raw Auth Response:', {
+            status: response.status,
+            headers: response.headers,
+            data: response.data
+        });
+
         // Handle different response formats
         let tokenData;
         const responseData = response.data;
 
-        // Check for successful response with token
+        // Check for successful response with token (direct token in response)
         if (responseData && responseData.TokenId) {
             tokenData = responseData;
         } 
+        // Check for response with Data property containing the token
+        else if (responseData && responseData.Data && responseData.Data.TokenId) {
+            tokenData = responseData.Data;
+        }
         // Check for error in response
         else if (responseData && responseData.error) {
             throw new Error(responseData.error);
@@ -246,6 +261,8 @@ async function authenticate() {
                 const parsed = JSON.parse(responseData);
                 if (parsed.TokenId) {
                     tokenData = parsed;
+                } else if (parsed.Data && parsed.Data.TokenId) {
+                    tokenData = parsed.Data;
                 } else {
                     throw new Error('Invalid token in response');
                 }
@@ -335,15 +352,14 @@ async function makeRequest(endpoint, params = {}, req = {}, useBookingApi = fals
             throw new Error('No authentication token available');
         }
 
-        // Determine the endpoint URL
-        let apiUrl;
-        if (endpoint === '/Search') {
-            apiUrl = CONFIG.flightSearchUrl;
-        } else if (useBookingApi) {
-            apiUrl = `${CONFIG.baseUrl}${endpoint}`;
+        // Determine base URL based on endpoint and API type
+        let baseUrl;
+        if (useBookingApi) {
+            baseUrl = CONFIG.bookingBaseUrl.endsWith('/') ? CONFIG.bookingBaseUrl.slice(0, -1) : CONFIG.bookingBaseUrl;
         } else {
-            apiUrl = `${CONFIG.baseUrl}${endpoint}`;
+            baseUrl = CONFIG.flightBaseUrl.endsWith('/') ? CONFIG.flightBaseUrl.slice(0, -1) : CONFIG.flightBaseUrl;
         }
+        const apiUrl = `${baseUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
 
         // Prepare request parameters
         const requestParams = {
@@ -554,6 +570,9 @@ async function makeRequest(endpoint, params = {}, req = {}, useBookingApi = fals
                 if (newParams.TokenId) newParams.TokenId = token.TokenId;
                 
                 // Retry the request with the new token
+                if (req._retryCount && req._retryCount > 1) throw new Error('Max retries exceeded');
+                req._retryCount = (req._retryCount || 0) + 1;
+
                 return makeRequest(endpoint, newParams, req, useBookingApi);
                 
             } catch (refreshError) {
@@ -669,39 +688,33 @@ export const searchFlights = async (searchParams = {}, req = {}) => {
         const tboSearchParams = {
             EndUserIp: CONFIG.vpsIp,
             TokenId: '', // Will be set in makeRequest
-            AdultCount: parseInt(searchParams.adults) || 1,
-            ChildCount: parseInt(searchParams.children) || 0,
-            InfantCount: parseInt(searchParams.infants) || 0,
-            DirectFlight: Boolean(searchParams.nonStop),
+            AdultCount: String(parseInt(searchParams.adults) || 1),
+            ChildCount: String(parseInt(searchParams.children) || 0),
+            InfantCount: String(parseInt(searchParams.infants) || 0),
+            DirectFlight: false,
             OneStopFlight: false,
             JourneyType: searchParams.journeyType === 'roundtrip' ? '2' : '1',
+            PreferredAirlines: null,
             Segments: [
                 {
                     Origin: String(searchParams.origin).toUpperCase(),
                     Destination: String(searchParams.destination).toUpperCase(),
-                    FlightCabinClass: searchParams.cabinClass || 'Economy',
-                    PreferredDepartureTime: formatDate(searchParams.departureDate),
-                    PreferredArrivalTime: ''
+                    FlightCabinClass: getCabinClassCode(searchParams.cabinClass || 'Economy'),
+                    PreferredDepartureTime: formatDate(searchParams.departureDate) + 'T00:00:00',
+                    PreferredArrivalTime: formatDate(searchParams.departureDate) + 'T00:00:00'
                 }
             ],
-            Sources: ['TBO'],
-            PreferredAirlines: searchParams.preferredAirlines || [],
-            Currency: searchParams.currency || 'INR',
-            IsDomestic: true,
-            IncludeAllFlightOptions: true,
-            IsRefundable: Boolean(searchParams.refundableOnly),
-            NoOfSeats: (parseInt(searchParams.adults) || 1) + (parseInt(searchParams.children) || 0),
-            TraceId: traceId
+            Sources: ['6E'] // Default to IndiGo, can be made configurable
         };
 
         // Add return segment for round trips
-        if (searchParams.journeyType === 'roundtrip' && searchParams.returnDate) {
+        if (searchParams.journeyType === '2' && searchParams.returnDate) {
             tboSearchParams.Segments.push({
                 Origin: String(searchParams.destination).toUpperCase(),
                 Destination: String(searchParams.origin).toUpperCase(),
-                FlightCabinClass: searchParams.cabinClass || 'Economy',
-                PreferredDepartureTime: formatDate(searchParams.returnDate),
-                PreferredArrivalTime: ''
+                FlightCabinClass: getCabinClassCode(searchParams.cabinClass || 'Economy'),
+                PreferredDepartureTime: formatDate(searchParams.returnDate) + 'T00:00:00',
+                PreferredArrivalTime: formatDate(searchParams.returnDate) + 'T00:00:00'
             });
         }
 
@@ -718,8 +731,13 @@ export const searchFlights = async (searchParams = {}, req = {}) => {
         }
 
         // Check for errors in response
-        if (response.Response.Error) {
-            throw new Error(response.Response.Error.ErrorMessage || 'Error in flight search');
+        const responseStatus = response.Response.ResponseStatus;
+        const errorInfo = response.Response.Error;
+        
+        if (responseStatus !== 1 || (errorInfo && errorInfo.ErrorCode !== 0)) {
+            const errorMsg = errorInfo?.ErrorMessage || 'Error in flight search';
+            console.error('TBO API Error:', errorMsg);
+            throw new Error(errorMsg);
         }
 
         if (!response.Response.Results || !Array.isArray(response.Response.Results)) {
@@ -728,73 +746,96 @@ export const searchFlights = async (searchParams = {}, req = {}) => {
 
         // Extract and format flight results
         const results = [];
-        const segments = response.Response.Results[0]?.Segments || [];
+        const flightResults = response.Response.Results[0] || [];
+        const segments = Array.isArray(flightResults) ? flightResults : [];
         const traceIdFromResponse = response.Response.TraceId || traceId;
         
-        segments.forEach((segment, segmentIndex) => {
-            if (!segment.Flights || !Array.isArray(segment.Flights)) return;
+        // Helper function to format airport information
+        const formatAirportInfo = (airport) => ({
+            code: airport.AirportCode,
+            name: airport.AirportName,
+            terminal: airport.Terminal,
+            city: airport.CityName,
+            country: airport.CountryName,
+            dateTime: airport.DepTime || airport.ArrTime
+        });
+        
+        // Process each flight segment
+        segments.forEach((flightGroup, groupIndex) => {
+            if (!flightGroup.Segments || !Array.isArray(flightGroup.Segments)) return;
             
-            segment.Flights.forEach((flight, flightIndex) => {
-                const flightId = `${flight.Airline?.FlightNumber || 'FLT'}-${segmentIndex}-${flightIndex}`;
-                const fare = flight.Fare || {};
-                const airline = flight.Airline || {};
-                const origin = flight.Origin || {};
-                const destination = flight.Destination || {};
+            // Process each flight in the segment
+            flightGroup.Segments.forEach((segment, segmentIndex) => {
+                if (!segment || !Array.isArray(segment)) return;
                 
-                results.push({
-                    id: flightId,
-                    airline: {
-                        code: airline.AirlineCode,
-                        name: airline.AirlineName,
-                        number: airline.FlightNumber,
-                        logo: airline.AirlineLogo
-                    },
-                    flightNumber: airline.FlightNumber,
-                    origin: {
-                        code: origin.AirportCode,
-                        name: origin.AirportName,
-                        city: origin.CityName,
-                        terminal: origin.Terminal,
-                        dateTime: origin.DepTime,
-                        date: origin.DepTime ? new Date(origin.DepTime).toISOString().split('T')[0] : ''
-                    },
-                    destination: {
-                        code: destination.AirportCode,
-                        name: destination.AirportName,
-                        city: destination.CityName,
-                        terminal: destination.Terminal,
-                        dateTime: destination.ArrTime,
-                        date: destination.ArrTime ? new Date(destination.ArrTime).toISOString().split('T')[0] : ''
-                    },
-                    departureTime: origin.DepTime,
-                    arrivalTime: destination.ArrTime,
-                    duration: flight.Duration || '',
-                    stops: parseInt(flight.NoOfStops) || 0,
-                    cabinClass: flight.CabinClass || searchParams.cabinClass || 'Economy',
-                    fare: {
-                        baseFare: fare.BaseFare || 0,
-                        tax: fare.Tax || 0,
-                        otherCharges: fare.OtherCharges || 0,
-                        discount: fare.Discount || 0,
-                        publishedFare: fare.PublishedFare || 0,
-                        currency: fare.Currency || 'INR',
-                        isRefundable: fare.IsRefundable || false,
-                        isLCC: fare.IsLCC || false
-                    },
-                    availableSeats: flight.SeatsAvailable || 0,
-                    bookingClass: flight.BookingClass || '',
-                    fareBasis: flight.FareBasis || '',
-                    fareRules: flight.FareRules || {},
-                    baggage: flight.Baggage || {},
-                    amenities: flight.Amenities || {},
-                    sessionId: traceIdFromResponse,
-                    resultIndex: segmentIndex.toString(),
-                    isETicketEligible: flight.IsETicketEligible || false,
-                    isMealIncluded: flight.IsMealIncluded || false,
-                    isVisaRequired: flight.IsVisaRequired || false
+                segment.forEach((flight, flightIndex) => {
+                    const flightId = `${flight.Airline?.FlightNumber || 'FLT'}-${segmentIndex}-${flightIndex}`;
+                    const fare = flight.Fare || {};
+                    const airline = flight.Airline || {};
+                    const origin = flight.Origin || {};
+                    const destination = flight.Destination || {};
+                    
+                    const flightData = {
+                        id: flightId,
+                        airline: {
+                            code: airline.AirlineCode || '',
+                            name: airline.AirlineName || '',
+                            flightNumber: airline.FlightNumber || '',
+                            fareClass: airline.FareClass || '',
+                            operatingCarrier: airline.OperatingCarrier || airline.AirlineCode || ''
+                        },
+                        origin: origin.Airport ? formatAirportInfo(origin.Airport) : {
+                            code: origin.AirportCode || '',
+                            name: origin.AirportName || '',
+                            terminal: origin.Terminal || '',
+                            city: origin.CityName || '',
+                            country: origin.CountryName || '',
+                            dateTime: origin.DepTime || ''
+                        },
+                        destination: destination.Airport ? formatAirportInfo(destination.Airport) : {
+                            code: destination.AirportCode || '',
+                            name: destination.AirportName || '',
+                            terminal: destination.Terminal || '',
+                            city: destination.CityName || '',
+                            country: destination.CountryName || '',
+                            dateTime: destination.ArrTime || ''
+                        },
+                        departureTime: origin.DepTime || '',
+                        arrivalTime: destination.ArrTime || '',
+                        duration: flight.Duration || '',
+                        stops: parseInt(flight.NoOfStops) || 0,
+                        cabinClass: flight.CabinClass || searchParams.cabinClass || 'Economy',
+                        fare: {
+                            baseFare: fare.BaseFare || 0,
+                            tax: fare.Tax || 0,
+                            yqTax: fare.YQTax || 0,
+                            otherCharges: fare.OtherCharges || 0,
+                            discount: fare.Discount || 0,
+                            publishedFare: fare.PublishedFare || 0,
+                            offeredFare: fare.OfferedFare || 0,
+                            currency: fare.Currency || 'INR',
+                            isRefundable: fare.IsRefundable || false,
+                            isLCC: fare.IsLCC || false,
+                            taxBreakup: fare.TaxBreakup || []
+                        },
+                        availableSeats: flight.SeatsAvailable || 0,
+                        bookingClass: flight.BookingClass || '',
+                        fareBasis: flight.FareBasis || '',
+                        fareRules: flight.FareRules || {},
+                        baggage: flight.Baggage || {},
+                        amenities: flight.Amenities || {},
+                        sessionId: traceIdFromResponse,
+                        resultIndex: segmentIndex.toString(),
+                        isETicketEligible: flight.IsETicketEligible || false,
+                        isMealIncluded: flight.IsMealIncluded || false,
+                        isVisaRequired: flight.IsVisaRequired || false
+                    };
+                    
+                    results.push(flightData);
                 });
             });
         });
+        
 
         return {
             success: true,
@@ -833,6 +874,29 @@ export const searchFlights = async (searchParams = {}, req = {}) => {
         return errorResponse;
     }
 };
+
+/**
+ * Convert cabin class name to TBO API code
+ * @param {string} cabinClass - Cabin class name (e.g., 'Economy', 'Business')
+ * @returns {string} TBO API cabin class code
+ */
+function getCabinClassCode(cabinClass) {
+    if (!cabinClass) return '1'; // Default to Economy
+    
+    const classMap = {
+        'economy': '1',
+        'business': '2',
+        'first': '3',
+        'premium economy': '4',
+        'premiumeconomy': '4',
+        'premium_economy': '4',
+        'first class': '3',
+        'business class': '2',
+        'economy class': '1'
+    };
+    
+    return classMap[cabinClass.toLowerCase()] || '1';
+}
 
 /**
  * Format date for TBO API (YYYY-MM-DD)
