@@ -30,7 +30,7 @@ function log(message, data = null) {
 }
 
 // ===========================================================
-// 🌍 GET CITIES BY COUNTRY
+// 🌍 GET CITIES BY COUNTRY (Updated)
 // ===========================================================
 export async function getCitiesByCountry(countryCode = "IN") {
     try {
@@ -41,7 +41,8 @@ export async function getCitiesByCountry(countryCode = "IN") {
             TokenId: token.TokenId
         };
 
-        const url = `${CONFIG.baseHotelUrl}GetDestinationCityList`;
+        // ✅ Updated endpoint (old one was 404)
+        const url = `${CONFIG.baseTboUrl}TBOHotelDestinationSearch`;
         log("🌍 Fetching cities for country:", { url, body });
 
         const res = await axios.post(url, body, {
@@ -51,12 +52,12 @@ export async function getCitiesByCountry(countryCode = "IN") {
 
         log("🌆 Raw city API response:", res.data);
 
-        if (res.data?.ResponseStatus?.Status === "Success" && res.data.CityList) {
-            log(`✅ Found ${res.data.CityList.length} cities`);
-            return res.data.CityList;
+        if (res.data?.ResponseStatus?.Status === "Success" && res.data.DestinationCityList) {
+            log(`✅ Found ${res.data.DestinationCityList.length} cities`);
+            return res.data.DestinationCityList;
         }
 
-        log("⚠️ CityList request failed or empty");
+        log("⚠️ City list request failed or empty");
         if (res.data?.ResponseStatus) {
             log("Error details:", res.data.ResponseStatus);
         }
@@ -70,6 +71,7 @@ export async function getCitiesByCountry(countryCode = "IN") {
         return [];
     }
 }
+
 
 
 // ===========================================================
