@@ -28,74 +28,67 @@ function log(message, data = null) {
     fs.appendFileSync(file, entry);
     console.log(message, data || "");
 }
-
 // ===========================================================
-// 🌍 GET CITIES BY COUNTRY (Using TBO's API)
+// 🌍 GET CITIES BY COUNTRY (Using TBO's CityList API)
 // ===========================================================
 export async function getCitiesByCountry(countryCode = "IN") {
     try {
         const token = await getAuthToken();
-        
-        // Updated to use the correct endpoint based on TBO API documentation
-        const url = `https://api.travelboutiqueonline.com/SharedAPI/SharedData.svc/rest/GetCountry`;
-        
+
+        // Using the correct endpoint for CityList
+        const url = `http://api.tbotechnology.in/TBOHolidays_HotelAPI/CityList`;
+
         const requestBody = {
             CountryCode: countryCode,
             EndUserIp: CONFIG.endUserIp,
             TokenId: token.TokenId
         };
 
-        log(`🌍 Fetching country details for ${countryCode}`, { url, requestBody });
-        
-        // First get country details to find available cities
-        const countryRes = await axios.post(url, requestBody, {
-            headers: { 
+        log(`🌍 Fetching cities for country ${countryCode}`, { url, requestBody });
+
+        const res = await axios.post(url, requestBody, {
+            headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json'
             },
             timeout: CONFIG.timeout
         });
 
-        log(`🌆 Country API Response:`, {
-            status: countryRes.status,
-            data: countryRes.data
+        log(`🌆 Cities API Response:`, {
+            status: res.status,
+            data: res.data
         });
 
-        // Now get cities for the country
-        const citiesUrl = `https://api.travelboutiqueonline.com/SharedAPI/SharedData.svc/rest/GetCity`;
-        
-        // Get all cities (we'll filter by country in the response)
-        const citiesRes = await axios.post(citiesUrl, {
-            EndUserIp: CONFIG.endUserIp,
-            TokenId: token.TokenId
-        }, {
-            headers: { 
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            timeout: CONFIG.timeout
-        });
+        // Check if the response indicates success
+        if (res.data?.Status?.Code === 200) {
+            const cityList = res.data.CityList || [];
+            log(`✅ Found ${cityList.length} cities for ${countryCode}`);
 
-        log(`🌆 Cities API Response Status:`, citiesRes.status);
-        
-        // Filter cities by country code
-        let cityList = [];
-        if (citiesRes.data && Array.isArray(citiesRes.data)) {
-            cityList = citiesRes.data.filter(city => 
-                city.CountryCode === countryCode
-            );
+            return {
+                ResponseStatus: {
+                    Status: 'Success',
+                    Code: res.data.Status.Code,
+                    Description: res.data.Status.Description
+                },
+                CityList: cityList
+            };
         }
 
-        log(`✅ Found ${cityList.length} cities for ${countryCode}`);
-        
+        // Handle error response
+        const errorMsg = res.data?.Status?.Description || 'Unknown error';
+        log(`❌ API Error: ${errorMsg}`);
+
         return {
-            ResponseStatus: { 
-                Status: 'Success',
-                Error: cityList.length === 0 ? { ErrorMessage: 'No cities found' } : null
+            ResponseStatus: {
+                Status: 'Error',
+                Error: {
+                    ErrorMessage: errorMsg,
+                    Code: res.data?.Status?.Code
+                }
             },
-            CityList: cityList
+            CityList: []
         };
-        
+
     } catch (error) {
         log('❌ Error in getCitiesByCountry:', {
             message: error.message,
@@ -103,14 +96,14 @@ export async function getCitiesByCountry(countryCode = "IN") {
             response: error.response?.data,
             stack: error.stack
         });
-        
+
         return {
-            ResponseStatus: { 
+            ResponseStatus: {
                 Status: 'Error',
-                Error: { 
-                    ErrorMessage: error.response?.data?.message || 
-                                error.message || 
-                                'Failed to fetch cities from TBO API' 
+                Error: {
+                    ErrorMessage: error.response?.data?.message ||
+                        error.message ||
+                        'Failed to fetch cities from TBO API'
                 }
             },
             CityList: []
