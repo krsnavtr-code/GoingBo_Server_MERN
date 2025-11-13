@@ -181,7 +181,7 @@ const CONFIG = {
     
     // API endpoints
     baseUrl: 'https://api.tbotechnology.in',
-    sharedApiUrl: 'http://api.tektravels.com/SharedData.svc/rest',
+    sharedApiUrl: 'http://Sharedapi.tektravels.com/SharedData.svc/rest',
     
     // Static data API credentials (for CountryList, CityList, etc.)
     staticApiUsername: 'DELG738',
@@ -212,12 +212,12 @@ const logMessage = (message, type = 'info') => {
 // Get authentication token from TBO API
 const getAuthToken = async () => {
     try {
-        const authUrl = `http://api.tektravels.com/SharedData.svc/rest/Authenticate`;
+        const authUrl = `https://api.tektravels.com/SharedServices/Authentication/Authenticate`;
         const requestBody = {
-            ClientId: CONFIG.clientId,
-            UserName: CONFIG.username,
-            Password: CONFIG.password,
-            EndUserIp: CONFIG.endUserIp
+            "ClientId": "ApiIntegrationNew",
+            "UserName": "DELG738",
+            "Password": "Htl@DEL#38/G",
+            "EndUserIp": "82.112.236.83"
         };
 
         console.log('Authentication request:', {
@@ -228,9 +228,6 @@ const getAuthToken = async () => {
             }
         });
 
-        // Create Basic Auth token for static data API
-        const authToken = Buffer.from(`${CONFIG.staticApiUsername}:${CONFIG.staticApiPassword}`).toString('base64');
-
         const response = await axios.post(
             authUrl,
             requestBody,
@@ -238,7 +235,6 @@ const getAuthToken = async () => {
                 headers: { 
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
-                    'Authorization': `Basic ${authToken}`
                 },
                 timeout: 10000
             }
@@ -265,7 +261,6 @@ const getAuthToken = async () => {
         console.error('Authentication failed:', errorMessage);
         throw new Error(errorMessage);
 
-        throw new Error(`Authentication failed: ${JSON.stringify(response.data || 'No token in response')}`);
     } catch (error) {
         const errorDetails = {
             message: error.message,
