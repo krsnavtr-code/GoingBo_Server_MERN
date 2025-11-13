@@ -30,99 +30,76 @@ function log(message, data = null) {
 }
 
 // ===========================================================
-// 🌍 GET CITIES BY COUNTRY (Updated with multiple endpoints fallback)
+// 🌍 GET CITIES BY COUNTRY (Using TBO's DestinationCityList API)
 // ===========================================================
 export async function getCitiesByCountry(countryCode = "IN") {
-    const endpoints = [
-        `${CONFIG.baseTboUrl}GetCityList`,
-        `${CONFIG.baseTboUrl}CityList`,
-        `${CONFIG.baseHotelUrl}GetCityList`,
-        `${CONFIG.baseHotelUrl}CityList`,
-        `https://api.tbotechnology.in/hotelapi_v7/hotelservice.svc/GetCityList`,
-        `https://api.tbotechnology.in/hotelapi/hotelservice.svc/GetCityList`
-    ];
+    try {
+        const token = await getAuthToken();
+        
+        // Using the baseSharedUrl from tboAuth since it's the correct base URL for this endpoint
+        const url = `https://api.travelboutiqueonline.com/SharedAPI/SharedData.svc/rest/GetCityList`;
+        
+        const requestBody = {
+            CountryCode: countryCode,
+            EndUserIp: CONFIG.endUserIp,
+            TokenId: token.TokenId
+        };
 
-    const body = {
-        CountryCode: countryCode,
-        EndUserIp: CONFIG.endUserIp,
-        TokenId: '' // Will be set in the loop
-    };
+        log(`🌍 Fetching cities for country ${countryCode}`, { url, requestBody });
+        
+        const res = await axios.post(url, requestBody, {
+            headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            timeout: CONFIG.timeout
+        });
 
-    // Try each endpoint until one works
-    for (const url of endpoints) {
-        try {
-            // Get a fresh token for each attempt
-            const token = await getAuthToken();
-            body.TokenId = token.TokenId;
+        log(`🌆 API Response:`, {
+            status: res.status,
+            data: res.data
+        });
 
-            log(`🌍 Trying endpoint: ${url}`, { body });
-            
-            const res = await axios.post(url, body, {
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
-                timeout: CONFIG.timeout,
-                validateStatus: () => true // Don't throw on HTTP errors
-            });
-
-            log(`🌆 Response from ${url}:`, {
-                status: res.status,
-                data: res.data
-            });
-
-            // If we got a successful response with data
-            if (res.status === 200 && res.data) {
-                // Different APIs might structure the response differently
-                const cityList = res.data.CityList || 
-                               res.data.cityList || 
-                               res.data.Data?.CityList ||
-                               res.data.Data?.cityList ||
-                               [];
-                
-                if (Array.isArray(cityList) && cityList.length > 0) {
-                    log(`✅ Found ${cityList.length} cities from ${url}`);
-                    // Return in the format expected by the controller
-                    return {
-                        ResponseStatus: { Status: 'Success' },
-                        CityList: cityList
-                    };
-                }
-
-                // If we got a successful response but no cities, check for error in response
-                if (res.data.ResponseStatus?.Status === 'Success' && !cityList.length) {
-                    log('⚠️ Successful response but no cities found');
-                    return [];
-                }
-
-                // Log specific error if available
-                if (res.data.ResponseStatus) {
-                    log(`⚠️ API Error: ${res.data.ResponseStatus.Error?.ErrorMessage || 'Unknown error'}`);
-                }
-            } else if (res.status === 401) {
-                log(`🔑 Authentication failed for ${url} - trying next endpoint`);
-                continue; // Try next endpoint
-            } else {
-                log(`⚠️ Unexpected response from ${url} - Status: ${res.status}`);
-            }
-        } catch (err) {
-            log(`❌ Error with endpoint ${url}:`, {
-                message: err.message,
-                code: err.code,
-                response: err.response?.data
-            });
-            // Continue to next endpoint
+        // Check if the response indicates success
+        if (res.data?.ResponseStatus?.Status === 'Success') {
+            const cityList = res.data.CityList || [];
+            log(`✅ Found ${cityList.length} cities`);
+            return {
+                ResponseStatus: { Status: 'Success' },
+                CityList: cityList
+            };
         }
-    }
 
-    log('❌ All endpoints failed to return city data');
-    return { 
-        ResponseStatus: { 
-            Status: 'Error', 
-            Error: { ErrorMessage: 'Failed to fetch cities from all endpoints' } 
-        },
-        CityList: [] 
-    };
+        // Handle error response
+        const errorMsg = res.data?.ResponseStatus?.Error?.ErrorMessage || 'Unknown error';
+        log(`❌ API Error: ${errorMsg}`);
+        
+        return {
+            ResponseStatus: { 
+                Status: 'Error',
+                Error: { ErrorMessage: errorMsg }
+            },
+            CityList: []
+        };
+        
+    } catch (error) {
+        log('❌ Error fetching cities:', {
+            message: error.message,
+            code: error.code,
+            response: error.response?.data,
+            stack: error.stack
+        });
+        
+        return {
+            ResponseStatus: { 
+                Status: 'Error',
+                Error: { 
+                    ErrorMessage: error.response?.data?.message || error.message || 'Failed to fetch cities' 
+                }
+            },
+            CityList: []
+        };
+    }
 }
 
 
