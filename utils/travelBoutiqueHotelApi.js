@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import { v4 as uuidv4 } from 'uuid';
 
 // Get current directory
 const __filename = fileURLToPath(import.meta.url);
@@ -22,10 +23,12 @@ const CONFIG = {
     username: process.env.TBO_HOTEL_USERNAME || 'DELG738',
     password: process.env.TBO_HOTEL_PASSWORD || 'Htl@DEL#38/G',
     baseUrl: 'https://api.travelboutiqueonline.com',
-    hotelApiUrl: 'https://affiliate.travelboutiqueonline.com/HotelAPI',
+    hotelApiUrl: 'https://apiwr.tboholidays.com/HotelAPI',
     bookingApiUrl: 'https://hotelbooking.travelboutiqueonline.com/HotelAPI_V10/HotelService.svc/rest',
     logFile: path.join(LOG_DIR, `hotel_${new Date().toISOString().split('T')[0]}.log`),
-    auth: null
+    auth: null,
+    clientId: 'travelcategory',
+    clientSecret: 'Tra@59334536'
 };
 
 // Generate basic auth token
@@ -45,15 +48,21 @@ const logMessage = (message, type = 'info') => {
 };
 
 // Make authenticated request to TBO Hotel API
-const makeHotelRequest = async (endpoint, params = {}, method = 'post', isBookingApi = false) => {
+const makeHotelRequest = async (endpoint, params = {}, method = 'post', isBookingApi = false, useClientAuth = false) => {
     try {
         const baseUrl = isBookingApi ? CONFIG.bookingApiUrl : CONFIG.hotelApiUrl;
         const url = `${baseUrl}${endpoint}`;
 
         const headers = {
             'Content-Type': 'application/json',
-            'Authorization': `Basic ${getAuthToken()}`
+            'Authorization': useClientAuth 
+                ? `Basic ${Buffer.from(`${CONFIG.clientId}:${CONFIG.clientSecret}`).toString('base64')}`
+                : `Basic ${getAuthToken()}`
         };
+        
+        // Add request ID for tracking
+        const requestId = uuidv4();
+        headers['X-Request-ID'] = requestId;
 
         logMessage(`Request: ${url}\n${JSON.stringify(params, null, 2)}`);
 
@@ -85,18 +94,78 @@ const makeHotelRequest = async (endpoint, params = {}, method = 'post', isBookin
 };
 
 // Hotel API Methods
+
+/**
+ * Fetch hotels by city code
+ * @param {Object} params - Search parameters
+ * @param {string} params.CityCode - City code to search hotels in
+ * @param {boolean} [params.IsDetailedResponse=false] - Whether to include detailed response
+ * @returns {Promise<Object>} List of hotels
+ */
+export const fetchHotels = async (params) => {
+    const defaultParams = {
+        IsDetailedResponse: false,
+        TokenId: process.env.TBO_AUTH_TOKEN || ''
+    };
+    
+    const requestParams = { ...defaultParams, ...params };
+    return makeHotelRequest('/TBOHotelCodeList', requestParams, 'post', false, true);
+};
+
+/**
+ * Search hotels with detailed parameters
+ * @param {Object} params - Search parameters
+ * @returns {Promise<Object>} Search results
+ */
 export const searchHotels = async (params) => {
-    return makeHotelRequest('/Search', params);
+    // Add default parameters
+    const defaultParams = {
+        ResponseTime: 23.0,
+        IsDetailedResponse: true,
+        GuestNationality: 'IN',
+        TokenId: process.env.TBO_AUTH_TOKEN || ''
+    };
+    
+    const requestParams = { ...defaultParams, ...params };
+    return makeHotelRequest('/Search', requestParams, 'post', false, true);
 };
 
+/**
+ * Get detailed information about a specific hotel
+ * @param {Object} params - Hotel details parameters
+ * @param {string} params.HotelCode - Hotel code to get details for
+ * @param {string} params.CheckIn - Check-in date (YYYY-MM-DD)
+ * @param {string} params.CheckOut - Check-out date (YYYY-MM-DD)
+ * @param {string} [params.GuestNationality=IN] - Guest nationality code
+ * @returns {Promise<Object>} Hotel details
+ */
 export const getHotelDetails = async (params) => {
-    return makeHotelRequest('/Hoteldetails', params);
+    const defaultParams = {
+        GuestNationality: 'IN',
+        TokenId: process.env.TBO_AUTH_TOKEN || ''
+    };
+    
+    const requestParams = { ...defaultParams, ...params };
+    return makeHotelRequest('/Hoteldetails', requestParams, 'post', false, true);
 };
 
+/**
+ * Pre-book a hotel room
+ * @param {Object} params - Pre-booking parameters
+ * @returns {Promise<Object>} Pre-booking details
+ */
 export const preBookHotel = async (params) => {
-    return makeHotelRequest('/PreBook', params);
+    if (!params.TokenId) {
+        params.TokenId = process.env.TBO_AUTH_TOKEN || '';
+    }
+    return makeHotelRequest('/PreBook', params, 'post', false, true);
 };
 
+/**
+ * Book a hotel room
+ * @param {Object} params - Booking parameters
+ * @returns {Promise<Object>} Booking confirmation
+ */
 export const bookHotel = async (params) => {
     return makeHotelRequest('/Book', params, 'post', true);
 };
@@ -109,11 +178,40 @@ export const getHotelCodeList = async (params) => {
     return makeHotelRequest('/TBOHotelCodeList', params);
 };
 
+/**
+ * Get available countries
+ * @returns {Promise<Object>} List of countries
+ */
+export const getCountries = async () => {
+    return makeHotelRequest('/CountryList', {}, 'post', false, true);
+};
+
+/**
+ * Get available cities in a country
+ * @param {string} countryCode - Country code
+ * @returns {Promise<Object>} List of cities
+ */
+export const getCitiesByCountry = async (countryCode) => {
+    return makeHotelRequest('/CityList', { CountryCode: countryCode }, 'post', false, true);
+};
+
+/**
+ * Get room types
+ * @returns {Promise<Object>} List of room types
+ */
+export const getRoomTypes = async () => {
+    return makeHotelRequest('/RoomType', {}, 'post', false, true);
+};
+
 export default {
+    fetchHotels,
     searchHotels,
     getHotelDetails,
     preBookHotel,
     bookHotel,
     getBookingDetails,
-    getHotelCodeList
+    getHotelCodeList,
+    getCountries,
+    getCitiesByCountry,
+    getRoomTypes
 };
