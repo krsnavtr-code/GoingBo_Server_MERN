@@ -5,7 +5,7 @@ import path from "path";
 import tboAuth from "./tboAuth.js";
 
 const CITY_CONFIG = {
-    baseUrl: "https://api.travelboutiqueonline.com/SharedAPI/SharedData.svc/rest/",
+    baseUrl: "https://api.tbotechnology.in/TBOHolidays_HotelAPI/",
     logDir: path.join(process.cwd(), "logs/TBO/cities"),
     timeout: 20000,
     endUserIp: "82.112.236.83"
@@ -33,19 +33,18 @@ export async function getCitiesByCountry(countryCode = "IN") {
         if (!token) {
             throw new Error("Failed to get authentication token");
         }
-        const url = `${CITY_CONFIG.baseUrl}GetDestinationCityList`;
+        const url = `${CITY_CONFIG.baseUrl}CityList`;
         
         log(`🌍 Fetching city list for ${countryCode}`, { url });
 
         const res = await axios.post(
             url,
+            { CountryCode: countryCode },
             {
-                CountryCode: countryCode,
-                EndUserIp: CITY_CONFIG.endUserIp,
-                TokenId: token
-            },
-            {
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": "Basic " + Buffer.from("travelcategory:Tra@59334536").toString("base64")
+                },
                 timeout: CITY_CONFIG.timeout
             }
         );
