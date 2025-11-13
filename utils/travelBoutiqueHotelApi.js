@@ -148,13 +148,17 @@ export const searchHotels = async (params) => {
 
         // Set default parameters
         const defaultParams = {
+            CheckIn: '',
+            CheckOut: '',
+            CityId: '',
+            CountryCode: 'IN',
+            GuestNationality: 'IN',
             ResponseTime: 23.0,
             IsDetailedResponse: true,
-            GuestNationality: 'IN',
-            TokenId: process.env.TBO_AUTH_TOKEN || '',
             HotelCodes: [],
             Filters: {
                 Refundable: false,
+                NoOfRooms: 1,
                 MealType: 0,
                 OrderBy: 0,
                 StarRating: 0
@@ -167,8 +171,9 @@ export const searchHotels = async (params) => {
         // Log the request for debugging
         console.log('Sending hotel search request with params:', JSON.stringify(requestParams, null, 2));
 
-        // Make the API request
-        const response = await makeHotelRequest('/Search', requestParams, 'post', false, true);
+        // Make the API request with authentication
+        // The makeHotelRequest function will handle the authentication via headers
+        const response = await makeHotelRequest('/Search', requestParams, 'post', false, false);
         
         // Check for error in response
         if (response.Status && response.Status.Code !== 200) {
