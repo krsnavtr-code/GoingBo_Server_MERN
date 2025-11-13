@@ -69,13 +69,22 @@ const getCitiesByCountry = async (countryCode) => {
 
         console.log(`Fetching cities for country code: ${countryCode}`);
         
+        // First, get the authentication token
+        const token = await getAuthToken();
+        if (!token) {
+            throw new Error('Failed to authenticate with TBO API');
+        }
+
         const requestData = {
             CountryCode: countryCode,
-            TokenId: '',  // Empty as per TBO documentation for static data
+            TokenId: token,
             EndUserIp: CONFIG.endUserIp
         };
 
-        console.log('CityList Request:', JSON.stringify(requestData, null, 2));
+        console.log('CityList Request:', JSON.stringify({
+            ...requestData,
+            TokenId: '***' // Don't log the actual token
+        }, null, 2));
 
         const response = await axios.post(
             `${CONFIG.baseUrl}/TBOHolidays_HotelAPI/CityList`,
@@ -83,7 +92,8 @@ const getCitiesByCountry = async (countryCode) => {
             {
                 headers: {
                     'Accept': 'application/json',
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
                 },
                 timeout: 15000
             }
@@ -91,28 +101,36 @@ const getCitiesByCountry = async (countryCode) => {
 
         console.log('CityList API Response:', JSON.stringify(response.data, null, 2));
 
-        // Handle different response formats
-        if (response.data) {
-            // Check if we have a valid response with data
-            if (response.data.Response && response.data.Response.CityList) {
-                return {
-                    success: true,
-                    data: response.data.Response.CityList,
-                    status: response.status
-                };
-            }
-            // Try alternative response format
-            else if (response.data.CityList) {
-                return {
-                    success: true,
-                    data: response.data.CityList,
-                    status: response.status
-                };
-            }
-            
-            // If we have data but couldn't find city list, log the full response
-            console.error('Unexpected CityList API response format:', response.data);
+        // Check for authentication errors
+        if (response.data && response.data.Status && response.data.Status.Code === 401) {
+            // Clear the auth token and retry once
+            authState.tokenId = null;
+            return await getCitiesByCountry(countryCode);
         }
+
+        // Handle successful response
+        if (response.data && response.data.ResponseStatus && response.data.ResponseStatus.Status === 'Success') {
+            return {
+                success: true,
+                data: response.data.CityList || [],
+                status: response.status
+            };
+        }
+
+        // Handle error response
+        if (response.data && response.data.ResponseStatus) {
+            return {
+                success: false,
+                error: {
+                    code: response.data.ResponseStatus.ErrorCode || 'API_ERROR',
+                    message: response.data.ResponseStatus.Description || 'Failed to fetch cities',
+                    response: response.data
+                }
+            };
+        }
+
+        // If we get here, the response format is unexpected
+        console.error('Unexpected CityList API response format:', response.data);
 
         return {
             success: false,
@@ -159,7 +177,7 @@ const CONFIG = {
     // TBO API credentials
     username: 'DELG738',
     password: 'Htl@DEL#38/G',
-    clientId: 'ApiIntegrationNew',
+    clientId: 'tboprod',
     
     // API endpoints
     baseUrl: 'https://api.tbotechnology.in',
