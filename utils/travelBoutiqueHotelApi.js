@@ -181,7 +181,7 @@ const CONFIG = {
     
     // API endpoints
     baseUrl: 'https://api.tbotechnology.in',
-    sharedApiUrl: 'http://Sharedapi.tektravels.com/SharedData.svc/rest',
+    sharedApiUrl: 'http://api.tektravels.com/SharedData.svc/rest',
     
     // Static data API credentials (for CountryList, CityList, etc.)
     staticApiUsername: 'DELG738',
@@ -212,7 +212,7 @@ const logMessage = (message, type = 'info') => {
 // Get authentication token from TBO API
 const getAuthToken = async () => {
     try {
-        const authUrl = `http://Sharedapi.tektravels.com/SharedData.svc/rest/Authenticate`;
+        const authUrl = `http://api.tektravels.com/SharedData.svc/rest/Authenticate`;
         const requestBody = {
             ClientId: CONFIG.clientId,
             UserName: CONFIG.username,
