@@ -212,7 +212,7 @@ const logMessage = (message, type = 'info') => {
 // Get authentication token from TBO API
 const getAuthToken = async () => {
     try {
-        const authUrl = `https://api.tektravels.com/SharedServices/Authentication/Authenticate`;
+        const authUrl = `https://api.tektravels.com/SharedServices/SharedData.svc/Authenticate`;
         const requestBody = {
             "ClientId": "ApiIntegrationNew",
             "UserName": "DELG738",
