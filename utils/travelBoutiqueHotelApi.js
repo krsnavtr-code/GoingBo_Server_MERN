@@ -1,279 +1,219 @@
-import axios from 'axios';
-import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
-import { v4 as uuidv4 } from 'uuid';
+import axios from "axios";
+import fs from "fs";
+import path from "path";
 
+// =============================
+// CONFIGURATION
+// =============================
+const CONFIG = {
+    username: "DELG738",
+    password: "Htl@DEL#38/G",
+    clientId: "tboprod",
+    endUserIp: "82.112.236.83",
+    baseSharedUrl: "https://api.travelboutiqueonline.com/SharedAPI/SharedData.svc/rest/",
+    baseHotelUrl: "https://api.tektravels.com/HotelAPI_V7/",
+    logDir: path.join(process.cwd(), "logs/TBO/hotels"),
+    tokenFile: path.join(process.cwd(), "logs/TBO/hotels/token.json"),
+    timeout: 20000
+};
 
-// Get current directory
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// =============================
+// UTILITIES
+// =============================
+if (!fs.existsSync(CONFIG.logDir)) fs.mkdirSync(CONFIG.logDir, { recursive: true });
 
-// Load environment variables
-dotenv.config();
-
-// Create necessary directories
-const LOG_DIR = path.join(__dirname, '../logs/TBO/hotels');
-if (!fs.existsSync(LOG_DIR)) {
-    fs.mkdirSync(LOG_DIR, { recursive: true });
+function log(message, data = null) {
+    const file = path.join(CONFIG.logDir, `hotel_${new Date().toISOString().split("T")[0]}.log`);
+    const entry = `[${new Date().toISOString()}] ${message} ${data ? JSON.stringify(data, null, 2) : ""}\n`;
+    fs.appendFileSync(file, entry);
+    console.log(message, data || "");
 }
 
-// TBO Hotel API Configuration
-// Store authentication state
-let authState = {
-    tokenId: null,
-    tokenAgencyId: null,
-    tokenMemberId: null
-};
+// =============================
+// TOKEN HANDLING
+// =============================
+function loadToken() {
+    if (fs.existsSync(CONFIG.tokenFile)) {
+        const token = JSON.parse(fs.readFileSync(CONFIG.tokenFile, "utf8"));
+        const today = new Date().toDateString();
+        const tokenDate = new Date(token.date).toDateString();
+        if (tokenDate === today) {
+            log("✅ Using cached TBO token");
+            return token;
+        }
+    }
+    return null;
+}
 
-const CONFIG = {
-    // TBO API credentials
-    username: 'DELG738',
-    password: 'Htl@DEL#38/G',
-    clientId: 'ApiIntegrationNew',
-    
-    // API endpoints
-    baseUrl: 'https://api.tektravels.com',
-    sharedApiUrl: 'https://api.tektravels.com/SharedServices/SharedData.svc/rest',
-    
-    // Static data API credentials (for CountryList, CityList, etc.)
-    staticApiUsername: 'DELG738',
-    staticApiPassword: 'Htl@DEL#38/G',
-    
-    // Logging
-    logFile: path.join(LOG_DIR, `hotel_${new Date().toISOString().split('T')[0]}.log`),
-    
-    // Client information
-    endUserIp: '82.112.236.83',
-    
-    // Timeouts (in ms)
-    defaultTimeout: 15000,
-    authTimeout: 10000
-};
+function saveToken(token) {
+    fs.writeFileSync(CONFIG.tokenFile, JSON.stringify({ ...token, date: new Date() }, null, 2));
+}
 
-// Get authentication token from TBO API
-const getAuthToken = async () => {
+// =============================
+// AUTHENTICATION
+// =============================
+export async function getAuthToken() {
+    const cached = loadToken();
+    if (cached) return cached;
+
+    const body = {
+        ClientId: CONFIG.clientId,
+        UserName: CONFIG.username,
+        Password: CONFIG.password,
+        EndUserIp: CONFIG.endUserIp
+    };
+
     try {
-        const authUrl = 'http://Sharedapi.tektravels.com/SharedData.svc/rest/Authenticate';
-
-        const requestBody = {
-            ClientId: CONFIG.clientId,
-            UserName: CONFIG.username,
-            Password: CONFIG.password,
-            EndUserIp: CONFIG.endUserIp
-        };
-
-        console.log('Authentication request:', {
-            url: authUrl,
-            requestBody: { ...requestBody, Password: '***' }
+        log("🔐 Authenticating...");
+        const res = await axios.post(`${CONFIG.baseSharedUrl}Authenticate`, body, {
+            headers: { "Content-Type": "application/json" },
+            timeout: CONFIG.timeout
         });
 
-        const response = await axios.post(authUrl, requestBody, {
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            timeout: CONFIG.authTimeout
-        });
-
-        console.log('Authentication response:', {
-            status: response.status,
-            statusText: response.statusText,
-            data: response.data
-        });
-
-        if (response.data?.TokenId) {
-            authState = {
-                tokenId: response.data.TokenId,
-                tokenAgencyId: response.data.Member?.AgencyId,
-                tokenMemberId: response.data.Member?.MemberId
-            };
-            console.log('✅ Auth successful:', authState);
-            return response.data.TokenId;
+        if (res.data?.TokenId) {
+            saveToken(res.data);
+            log("✅ Token fetched successfully");
+            return res.data;
         }
 
-        const errMsg = response.data?.Error?.ErrorMessage || 'Authentication failed';
-        throw new Error(errMsg);
-
-    } catch (error) {
-        const details = {
-            message: error.message,
-            code: error.code,
-            status: error.response?.status,
-            statusText: error.response?.statusText,
-            responseData: error.response?.data
-        };
-        console.error('Authentication error details:', JSON.stringify(details, null, 2));
-
-        if (error.response)
-            throw new Error(`Authentication failed with status ${error.response.status}: ${error.response.statusText}`);
-        if (error.request)
-            throw new Error('No response from authentication server');
-        throw new Error(`Authentication request error: ${error.message}`);
+        throw new Error(res.data?.Error?.ErrorMessage || "Authentication failed");
+    } catch (err) {
+        log("❌ Auth Error", err.message);
+        throw err;
     }
-};
+}
 
+// =============================
+// CITIES
+// =============================
+export async function getCitiesByCountry(countryCode = "IN") {
+    const token = await getAuthToken();
+    const body = { CountryCode: countryCode, EndUserIp: CONFIG.endUserIp, TokenId: token.TokenId };
 
-/**
- * Get list of cities for a specific country
- * @param {string} countryCode - ISO country code (e.g., 'IN' for India)
- * @returns {Promise<Object>} Object containing status and list of cities
- */
-const getCitiesByCountry = async (countryCode) => {
     try {
-        if (!countryCode) {
-            console.error('Country code is required for city search');
-            return {
-                success: false,
-                error: {
-                    code: 'MISSING_PARAMETER',
-                    message: 'Country code is required'
-                }
-            };
-        }
-
-        console.log(`Fetching cities for country code: ${countryCode}`);
-
-        // First, get the authentication token
-        const token = await getAuthToken();
-        if (!token) {
-            throw new Error('Failed to authenticate with TBO API');
-        }
-
-        const requestData = {
-            CountryCode: countryCode,
-            TokenId: token,
-            EndUserIp: CONFIG.endUserIp
-        };
-
-        console.log('CityList Request:', JSON.stringify({
-            ...requestData,
-            TokenId: '***' // Don't log the actual token
-        }, null, 2));
-
-        const response = await axios.post(
-            `${CONFIG.baseUrl}/HotelAPI_V7/CityList`,
-            requestData,
-            {
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                timeout: 15000
-            }
-        );
-
-        console.log('CityList API Response:', JSON.stringify(response.data, null, 2));
-
-        // Check for authentication errors
-        if (response.data && response.data.Status && response.data.Status.Code === 401) {
-            // Clear the auth token and retry once
-            authState.tokenId = null;
-            return await getCitiesByCountry(countryCode);
-        }
-
-        // Handle successful response
-        if (response.data && response.data.ResponseStatus && response.data.ResponseStatus.Status === 'Success') {
-            return {
-                success: true,
-                data: response.data.CityList || [],
-                status: response.status
-            };
-        }
-
-        // Handle error response
-        if (response.data && response.data.ResponseStatus) {
-            return {
-                success: false,
-                error: {
-                    code: response.data.ResponseStatus.ErrorCode || 'API_ERROR',
-                    message: response.data.ResponseStatus.Description || 'Failed to fetch cities',
-                    response: response.data
-                }
-            };
-        }
-
-        // If we get here, the response format is unexpected
-        console.error('Unexpected CityList API response format:', response.data);
-
-        return {
-            success: false,
-            error: {
-                code: 'INVALID_RESPONSE',
-                message: 'Invalid response format from CityList API',
-                response: response.data
-            }
-        };
-    } catch (error) {
-        console.error('Error in getCitiesByCountry:', error);
-        return {
-            success: false,
-            error: {
-                code: error.response?.status || 'REQUEST_FAILED',
-                message: error.message || 'Failed to fetch cities'
-            }
-        };
+        const res = await axios.post(`${CONFIG.baseHotelUrl}CityList`, body, {
+            headers: { "Content-Type": "application/json" },
+            timeout: CONFIG.timeout
+        });
+        if (res.data?.ResponseStatus?.Status === "Success") return res.data.CityList;
+        log("⚠️ CityList failed", res.data);
+        return [];
+    } catch (err) {
+        log("❌ CityList error", err.message);
+        return [];
     }
-};
+}
 
-/**
- * Get list of hotels for a specific city
- * @param {number} cityCode - TBO City code
- * @returns {Promise<Object>} Object containing status and hotel list
- */
-export const getTBOHotelCodeList = async (cityCode) => {
+// =============================
+// HOTEL SEARCH
+// =============================
+export async function searchHotels(searchParams) {
+    const token = await getAuthToken();
+    const body = { ...searchParams, EndUserIp: CONFIG.endUserIp, TokenId: token.TokenId };
+
     try {
-        if (!cityCode) {
-            return {
-                success: false,
-                error: {
-                    code: 'MISSING_PARAMETER',
-                    message: 'City code is required'
-                }
-            };
-        }
-
-        const response = await axios.post(
-            `${CONFIG.baseUrl}/HotelAPI_V7/HotelCodeList`,
-            { CityCode: parseInt(cityCode) },
-            {
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json'
-                },
-                timeout: 15000 // Give more time for hotel list requests
-            }
-        );
-
-        if (response.data && response.data.Hotels) {
-            return {
-                success: true,
-                data: response.data.Hotels,
-                status: response.status
-            };
-        }
-
-        return {
-            success: false,
-            error: {
-                code: 'INVALID_RESPONSE',
-                message: 'Invalid response format from TBOHotelCodeList API'
-            }
-        };
-    } catch (error) {
-        console.error('Error in getTBOHotelCodeList:', error);
-        return {
-            success: false,
-            error: {
-                code: error.response?.status || 'REQUEST_FAILED',
-                message: error.message || 'Failed to fetch hotel list'
-            }
-        };
+        const res = await axios.post(`${CONFIG.baseHotelUrl}Search`, body, {
+            headers: { "Content-Type": "application/json" },
+            timeout: CONFIG.timeout
+        });
+        return res.data;
+    } catch (err) {
+        log("❌ Search error", err.message);
+        throw err;
     }
-};
+}
 
-export {
-    getCitiesByCountry,
+// =============================
+// HOTEL DETAILS
+// =============================
+export async function getHotelDetails(params) {
+    const token = await getAuthToken();
+    const body = { ...params, EndUserIp: CONFIG.endUserIp, TokenId: token.TokenId };
+
+    try {
+        const res = await axios.post(`${CONFIG.baseHotelUrl}HotelDetails`, body, {
+            headers: { "Content-Type": "application/json" },
+            timeout: CONFIG.timeout
+        });
+        return res.data;
+    } catch (err) {
+        log("❌ Hotel details error", err.message);
+        throw err;
+    }
+}
+
+// =============================
+// PRE-BOOK
+// =============================
+export async function preBookHotel(params) {
+    const token = await getAuthToken();
+    const body = { ...params, EndUserIp: CONFIG.endUserIp, TokenId: token.TokenId };
+
+    try {
+        const res = await axios.post(`${CONFIG.baseHotelUrl}PreBook`, body, {
+            headers: { "Content-Type": "application/json" },
+            timeout: CONFIG.timeout
+        });
+        return res.data;
+    } catch (err) {
+        log("❌ PreBook error", err.message);
+        throw err;
+    }
+}
+
+// =============================
+// BOOK
+// =============================
+export async function bookHotel(params) {
+    const token = await getAuthToken();
+    const body = { ...params, EndUserIp: CONFIG.endUserIp, TokenId: token.TokenId };
+
+    try {
+        const res = await axios.post(`${CONFIG.baseHotelUrl}Book`, body, {
+            headers: { "Content-Type": "application/json" },
+            timeout: CONFIG.timeout
+        });
+        return res.data;
+    } catch (err) {
+        log("❌ Booking error", err.message);
+        throw err;
+    }
+}
+
+// =============================
+// BOOKING DETAILS
+// =============================
+export async function getBookingDetails(bookingId) {
+    const token = await getAuthToken();
+    const body = { BookingId: bookingId, EndUserIp: CONFIG.endUserIp, TokenId: token.TokenId };
+
+    try {
+        const res = await axios.post(`${CONFIG.baseHotelUrl}GetBookingDetail`, body, {
+            headers: { "Content-Type": "application/json" },
+            timeout: CONFIG.timeout
+        });
+        return res.data;
+    } catch (err) {
+        log("❌ Booking details error", err.message);
+        throw err;
+    }
+}
+
+// =============================
+// HOTEL CODE LIST
+// =============================
+export async function getTBOHotelCodeList({ countryCode = "IN" }) {
+    const token = await getAuthToken();
+    const body = { CountryCode: countryCode, EndUserIp: CONFIG.endUserIp, TokenId: token.TokenId };
+
+    try {
+        const res = await axios.post(`${CONFIG.baseHotelUrl}HotelCodeList`, body, {
+            headers: { "Content-Type": "application/json" },
+            timeout: CONFIG.timeout
+        });
+        return res.data?.Hotels || [];
+    } catch (err) {
+        log("❌ HotelCodeList error", err.message);
+        throw err;
+    }
 }
