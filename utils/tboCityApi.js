@@ -3,9 +3,13 @@ import fs from "fs";
 import path from "path";
 
 const CITY_CONFIG = {
-    baseUrl: "http://api.tbotechnology.in/TBOHolidays_HotelAPI/",
+    baseUrl: "https://api.travelboutiqueonline.com/SharedAPI/SharedData.svc/rest/",
     logDir: path.join(process.cwd(), "logs/TBO/cities"),
-    timeout: 20000
+    timeout: 20000,
+    username: "DELG738",
+    password: "Htl@DEL#38/G",
+    clientId: "ApiIntegrationNew",
+    endUserIp: "82.112.236.83"
 };
 
 if (!fs.existsSync(CITY_CONFIG.logDir)) {
@@ -23,20 +27,48 @@ function log(message, data = null) {
     console.log(message, data || "");
 }
 
-export async function getCitiesByCountry(countryCode = "IN") {
-    const url = `http://api.tbotechnology.in/TBOHolidays_HotelAPI/CityList`;
+async function getAuthToken() {
+    const url = `${CITY_CONFIG.baseUrl}Authenticate`;
+    const body = {
+        ClientId: CITY_CONFIG.clientId,
+        UserName: CITY_CONFIG.username,
+        Password: CITY_CONFIG.password,
+        EndUserIp: CITY_CONFIG.endUserIp
+    };
 
     try {
+        log("🔑 Authenticating with TBO API...");
+        const res = await axios.post(url, body, {
+            headers: { "Content-Type": "application/json" },
+            timeout: CITY_CONFIG.timeout
+        });
+
+        if (res.data?.TokenId) {
+            return res.data.TokenId;
+        }
+        throw new Error("Invalid authentication response");
+    } catch (err) {
+        log("❌ Authentication failed:", err.message);
+        throw err;
+    }
+}
+
+export async function getCitiesByCountry(countryCode = "IN") {
+    try {
+        const token = await getAuthToken();
+        const url = `${CITY_CONFIG.baseUrl}GetDestinationCityList`;
+        
         log(`🌍 Fetching city list for ${countryCode}`, { url });
 
         const res = await axios.post(
             url,
-            { CountryCode: countryCode },
             {
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": "Basic " + Buffer.from("travelcategory:Tra@59334536").toString("base64")
-                },
+                CountryCode: countryCode,
+                EndUserIp: CITY_CONFIG.endUserIp,
+                TokenId: token
+            },
+            {
+                headers: { "Content-Type": "application/json" },
                 timeout: CITY_CONFIG.timeout
             }
         );
