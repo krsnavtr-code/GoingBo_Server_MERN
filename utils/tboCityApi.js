@@ -2,7 +2,7 @@ import axios from "axios";
 import fs from "fs";
 import path from "path";
 
-import tboAuth from "./tboAuth";
+import tboAuth from "./tboAuth.js";
 
 const CITY_CONFIG = {
     baseUrl: "https://api.travelboutiqueonline.com/SharedAPI/SharedData.svc/rest/",
