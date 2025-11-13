@@ -55,52 +55,54 @@ const CONFIG = {
 // Get authentication token from TBO API
 const getAuthToken = async () => {
     try {
-        const authUrl = 'https://api.tbotechnology.in/SharedAPI/SharedData.svc/rest/Authenticate';
+        // Decide environment dynamically
+        const isProd = CONFIG.baseUrl.includes('tektravels.com');
+
+        // Correct base URL for each environment
+        const authUrl = isProd
+            ? 'https://api.tektravels.com/SharedServices/Authentication/Authenticate'
+            : 'https://api.tbotechnology.in/SharedServices/SharedData.svc/rest/Authenticate';
+
         const requestBody = {
-            "ClientId": "ApiIntegrationNew",
-            "UserName": "DELG738",
-            "Password": "Htl@DEL#38/G",
-            "EndUserIp": "82.112.236.83"
+            ClientId: CONFIG.clientId,
+            UserName: CONFIG.username,
+            Password: CONFIG.password,
+            EndUserIp: CONFIG.endUserIp
         };
 
         console.log('Authentication request:', {
             url: authUrl,
-            requestBody: { 
-                ...requestBody, 
-                Password: '***', // Don't log actual password
-            }
+            requestBody: { ...requestBody, Password: '***' }
         });
 
-        const response = await axios.post(
-            authUrl,
-            requestBody,
-            { 
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                },
-                timeout: 10000
-            }
-        );
-        
+        const response = await axios.post(authUrl, requestBody, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            timeout: CONFIG.authTimeout
+        });
+
         console.log('Authentication response:', {
             status: response.status,
             statusText: response.statusText,
             data: response.data
         });
 
-        if (response.data && response.data.Status === 1 && response.data.TokenId) {
-            // Store authentication details
+        // Parse both text and JSON responses
+        let data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+
+        if (data?.TokenId) {
             authState = {
-                tokenId: response.data.TokenId,
-                tokenAgencyId: response.data.Member?.AgencyId,
-                tokenMemberId: response.data.Member?.MemberId
+                tokenId: data.TokenId,
+                tokenAgencyId: data.Member?.AgencyId,
+                tokenMemberId: data.Member?.MemberId
             };
-            return response.data.TokenId;
+            console.log('✅ Authentication successful:', authState);
+            return data.TokenId;
         }
-        
-        // If we get here, authentication failed
-        const errorMessage = response.data?.Error?.ErrorMessage || 'Authentication failed';
+
+        const errorMessage = data?.Error?.ErrorMessage || 'Authentication failed';
         console.error('Authentication failed:', errorMessage);
         throw new Error(errorMessage);
 
@@ -112,22 +114,18 @@ const getAuthToken = async () => {
             statusText: error.response?.statusText,
             responseData: error.response?.data
         };
-        
         console.error('Authentication error details:', JSON.stringify(errorDetails, null, 2));
-        
+
         if (error.response) {
-            // The request was made and the server responded with a status code
-            // that falls out of the range of 2xx
             throw new Error(`Authentication failed with status ${error.response.status}: ${error.response.statusText}`);
         } else if (error.request) {
-            // The request was made but no response was received
             throw new Error('No response received from authentication server');
         } else {
-            // Something happened in setting up the request that triggered an Error
             throw new Error(`Authentication request error: ${error.message}`);
         }
     }
 };
+
 
 
 /**
