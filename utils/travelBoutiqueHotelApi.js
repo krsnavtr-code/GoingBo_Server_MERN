@@ -244,7 +244,21 @@ export const getCountries = async () => {
  * @returns {Promise<Object>} List of cities
  */
 export const getCitiesByCountry = async (countryCode) => {
-    return makeHotelRequest('/CityList', { CountryCode: countryCode }, 'post', false, true);
+    try {
+        const response = await makeHotelRequest('/CityList', { CountryCode: countryCode }, 'post', false, true);
+        
+        // The API returns the city list in the response.CityList property
+        if (response && response.CityList) {
+            return response;
+        }
+        
+        // If the response doesn't have the expected structure, log it and return an empty array
+        console.error('Unexpected response format from CityList API:', response);
+        return { CityList: [] };
+    } catch (error) {
+        console.error('Error in getCitiesByCountry:', error);
+        return { CityList: [] }; // Return empty array on error
+    }
 };
 
 /**

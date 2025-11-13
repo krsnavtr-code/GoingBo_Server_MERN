@@ -213,9 +213,16 @@ export const searchCities = async (req, res) => {
 
         // Get all cities for the country
         const response = await getCitiesByCountry(countryCode);
-
-        // Check if response has data property and it's an array
-        const cities = response && Array.isArray(response.data) ? response.data : [];
+        
+        // Log the raw response for debugging
+        console.log('Raw cities response:', JSON.stringify(response, null, 2));
+        
+        // The response should have a CityList array
+        const cities = (response && response.CityList && Array.isArray(response.CityList)) 
+            ? response.CityList 
+            : [];
+            
+        console.log('Processed cities:', cities.length);
 
         // Filter cities based on the search query
         const searchTerm = query.toLowerCase();
