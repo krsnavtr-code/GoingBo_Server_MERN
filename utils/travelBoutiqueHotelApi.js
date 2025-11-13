@@ -34,8 +34,8 @@ const CONFIG = {
     clientId: 'ApiIntegrationNew',
     
     // API endpoints
-    baseUrl: 'https://api.tbotechnology.in',
-    sharedApiUrl: 'http://Sharedapi.tektravels.com/SharedData.svc/rest',
+    baseUrl: 'https://api.tektravels.com',
+    sharedApiUrl: 'https://api.tektravels.com/SharedServices/SharedData.svc/rest',
     
     // Static data API credentials (for CountryList, CityList, etc.)
     staticApiUsername: 'DELG738',
@@ -56,9 +56,7 @@ const CONFIG = {
 const getAuthToken = async () => {
     try {
         // Select the right environment
-        const authUrl = CONFIG.baseUrl.includes('tbotechnology.in')
-            ? 'https://api.tbotechnology.in/SharedServices/Authentication/Authenticate'
-            : 'https://api.tektravels.com/SharedServices/Authentication/Authenticate';
+        const authUrl = `${CONFIG.sharedApiUrl}/Authenticate`;
 
         const requestBody = {
             ClientId: CONFIG.clientId,
@@ -158,7 +156,7 @@ const getCitiesByCountry = async (countryCode) => {
         }, null, 2));
 
         const response = await axios.post(
-            `${CONFIG.baseUrl}/TBOHolidays_HotelAPI/CityList`,
+            `${CONFIG.baseUrl}/HotelAPI_V7/CityList`,
             requestData,
             {
                 headers: {
@@ -241,7 +239,7 @@ export const getTBOHotelCodeList = async (cityCode) => {
         }
 
         const response = await axios.post(
-            `${CONFIG.baseUrl}/TBOHolidays_HotelAPI/TBOHotelCodeList`,
+            `${CONFIG.baseUrl}/HotelAPI_V7/HotelCodeList`,
             { CityCode: parseInt(cityCode) },
             {
                 headers: {
