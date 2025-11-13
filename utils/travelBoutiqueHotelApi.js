@@ -177,7 +177,7 @@ const CONFIG = {
     // TBO API credentials
     username: 'DELG738',
     password: 'Htl@DEL#38/G',
-    clientId: 'tboprod',
+    clientId: 'ApiIntegrationNew',
     
     // API endpoints
     baseUrl: 'https://api.tbotechnology.in',
