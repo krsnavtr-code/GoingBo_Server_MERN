@@ -1,5 +1,6 @@
-import { searchFlights, getFareRules, getFareQuote, bookFlight, confirmBooking, getBookingDetails } from '../utils/travelBoutiqueApi.js';
+import { searchFlights, getFareRules, getFareQuote, bookFlight, confirmTicket as confirmBooking, getBookingDetails } from '../utils/tboFlightService.js';
 import { validationResult } from 'express-validator';
+import logger from '../utils/logger.js';
 
 // @desc    Search for flights
 // @route   POST /api/flights/search
@@ -18,42 +19,75 @@ export const searchFlightsCtrl = async (req, res) => {
       });
     }
 
+    const {
+      origin,
+      destination,
+      departureDate,
+      returnDate,
+      adults = 1,
+      children = 0,
+      infants = 0,
+      cabinClass = '2', // Default to Economy
+      tripType = 'oneway'
+    } = req.body;
+
+    logger.info('Flight search request:', {
+      origin,
+      destination,
+      departureDate,
+      returnDate,
+      adults,
+      children,
+      infants,
+      cabinClass,
+      tripType,
+      ip: req.ip
+    });
+
     const searchParams = {
-      origin: req.body.origin,
-      destination: req.body.destination,
-      departureDate: req.body.departureDate,
-      returnDate: req.body.returnDate,
-      adults: parseInt(req.body.adults) || 1,
-      children: parseInt(req.body.children) || 0,
-      infants: parseInt(req.body.infants) || 0,
-      cabinClass: req.body.cabinClass || '1', // 1: All, 2: Economy, 3: Premium Economy, etc.
-      journeyType: req.body.journeyType || '1' // 1: OneWay, 2: Return
+      origin,
+      destination,
+      departure_date: departureDate,
+      return_date: returnDate,
+      adults: parseInt(adults),
+      children: parseInt(children),
+      infants: parseInt(infants),
+      travelclass: cabinClass,
+      journey_type: tripType === 'roundtrip' ? '2' : '1'
     };
 
-    const results = await searchFlights(searchParams, req);
+    const results = await searchFlights(searchParams);
     
-    if (results.success) {
-      res.json({
+    if (results && results.success) {
+      return res.json({
         success: true,
         data: results
       });
-    } else {
-      res.status(400).json({
-        success: false,
-        error: {
-          code: results.code || 'SEARCH_ERROR',
-          message: results.message || 'Failed to search for flights'
-        }
-      });
     }
+    
+    // If we get here, there was an error
+    throw new Error(results?.message || 'Failed to search for flights');
   } catch (error) {
-    console.error('Search controller error:', error);
-    res.status(500).json({
+    logger.error('Flight search error:', {
+      error: error.message,
+      stack: error.stack,
+      body: req.body,
+      params: req.params,
+      query: req.query,
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+    
+    const statusCode = error.statusCode || 500;
+    const errorCode = error.code || 'SERVER_ERROR';
+    const errorMessage = error.message || 'An unexpected error occurred';
+    
+    res.status(statusCode).json({
       success: false,
       error: {
-        code: 'SERVER_ERROR',
-        message: 'Internal server error',
-        details: process.env.NODE_ENV === 'development' ? error.message : {}
+        code: errorCode,
+        message: errorMessage,
+        ...(process.env.NODE_ENV === 'development' && { details: error.stack })
       }
     });
   }
