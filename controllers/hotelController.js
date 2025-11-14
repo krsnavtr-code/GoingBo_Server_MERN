@@ -1,6 +1,5 @@
-import {
-    getCitiesByCountry
-} from '../utils/travelBoutiqueHotelApi.js';
+import { searchHotelsByCity } from '../utils/tboCityApi.js';
+import { search_hotels } from '../utils/travelBoutiqueHotelApi.js';
 import Hotel from '../models/Hotel.js';
 
 // Search hotels
@@ -30,65 +29,59 @@ export const search = async (req, res) => {
             ? guests.childrenAges.map(age => parseInt(age) || 0).filter(age => age > 0)
             : [];
 
-        // First, search for city ID if city is not a number
-        let cityId = city;
-        if (isNaN(Number(city))) {
-            try {
-                const cities = await getCitiesByCountry(country);
-                const matchedCity = cities.find(c => 
-                    c.CityName.toLowerCase() === city.toLowerCase() || 
-                    c.CityCode === city
-                );
-                
-                if (!matchedCity) {
-                    return res.status(400).json({
-                        success: false,
-                        message: 'City not found. Please select a valid city from the dropdown.'
-                    });
-                }
-                cityId = matchedCity.CityId;
-            } catch (error) {
-                console.error('Error fetching cities:', error);
-                return res.status(500).json({
+        // Search for hotels in the specified city
+        try {
+            const hotelSearch = await searchHotelsByCity(city);
+
+            if (!hotelSearch.success || !hotelSearch.hotels?.length) {
+                return res.status(404).json({
                     success: false,
-                    message: 'Error looking up city information',
-                    error: error.message
+                    message: 'No hotels found in the specified city. Please try another city.'
                 });
             }
-        }
 
-        // Create room configuration
-        const paxRooms = [{
-            Adults: adults,
-            Children: children,
-            ChildrenAges: childrenAges,
-            RoomNo: 1
-        }];
+            // Get hotel codes from the search results
+            const hotelCodes = hotelSearch.hotels.map(hotel => hotel.HotelCode);
 
-        // Prepare search parameters
-        const searchParams = {
-            CheckIn: checkIn,
-            CheckOut: checkOut,
-            CityId: cityId,
-            CountryCode: country,
-            GuestNationality: 'IN',
-            PaxRooms: paxRooms,
-            ResponseTime: 23.0,
-            IsDetailedResponse: true,
-            HotelCodes: Array.isArray(hotelCodes) ? hotelCodes : [],
-            Filters: {
-                Refundable: false,
-                NoOfRooms: parseInt(rooms) || 1,
-                MealType: 0,
-                OrderBy: 0,
-                StarRating: 0
+            // Prepare search parameters for availability check
+            const searchParams = {
+                checkIn,
+                checkOut,
+                guestCountry: country,
+                hotelcodes: hotelCodes,
+                adult: adults,
+                child: children,
+                childAges: childrenAges,
+                rooms: parseInt(rooms) || 1
+            };
+
+            // Search for available hotels with the given parameters
+            const searchResults = await search_hotels(searchParams);
+
+            if (!searchResults || !searchResults.HotelResults) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'No available hotels found for the selected dates',
+                    results: []
+                });
             }
-        };
 
-        console.log('Searching hotels with params:', JSON.stringify(searchParams, null, 2));
-        
-        const result = await searchHotels(searchParams);
-        res.json(result);
+            // Return the search results
+            return res.json({
+                success: true,
+                message: 'Hotels found successfully',
+                results: searchResults.HotelResults,
+                totalHotels: searchResults.HotelResults.length
+            });
+
+        } catch (error) {
+            console.error('Error searching hotels:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Error searching for hotels',
+                error: error.message
+            });
+        }
     } catch (error) {
         console.error('Hotel search error:', error);
         res.status(500).json({
