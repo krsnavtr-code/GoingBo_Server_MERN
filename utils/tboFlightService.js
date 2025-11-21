@@ -399,13 +399,49 @@ async function searchFlights(params) {
         
         // Process the response
         if (response && response.Response) {
-            const results = Array.isArray(response.Response.Results) 
+            let results = Array.isArray(response.Response.Results) 
                 ? response.Response.Results 
                 : response.Response.Results ? [response.Response.Results] : [];
 
+            // For round-trip, separate outbound and return flights
+            let outboundFlights = [];
+            let returnFlights = [];
+            const isRoundTrip = journeyType === 2;
+
+            results.forEach(flight => {
+                if (!flight || !flight.Segments) return;
+
+                // Check if this is a round-trip with nested segments
+                if (isRoundTrip && Array.isArray(flight.Segments[0])) {
+                    // First array is outbound, second is return
+                    const outboundSegment = flight.Segments[0][0];
+                    const returnSegment = flight.Segments[1]?.[0];
+
+                    if (outboundSegment) {
+                        outboundFlights.push({
+                            ...flight,
+                            Segments: [outboundSegment],
+                            IsOutbound: true
+                        });
+                    }
+
+                    if (returnSegment) {
+                        returnFlights.push({
+                            ...flight,
+                            Segments: [returnSegment],
+                            IsReturn: true
+                        });
+                    }
+                } else {
+                    // One-way or standard format
+                    outboundFlights.push(flight);
+                }
+            });
+
             // Log search completion
             logMessage(
-                `[${searchId}] Search completed in ${responseTime}ms. Found ${results.length} results.`,
+                `[${searchId}] Search completed in ${responseTime}ms. ` +
+                `Found ${outboundFlights.length} outbound and ${returnFlights.length} return flights.`,
                 null,
                 'info'
             );
@@ -415,7 +451,9 @@ async function searchFlights(params) {
                 success: true,
                 searchId,
                 data: {
-                    results: results.slice(0, maxResults),
+                    isRoundTrip,
+                    outbound: outboundFlights.slice(0, maxResults),
+                    return: returnFlights.slice(0, maxResults),
                     traceId: response.Response.TraceId,
                     resultIndex: results[0]?.ResultIndex,
                     isDomestic: response.Response.IsDomestic,
