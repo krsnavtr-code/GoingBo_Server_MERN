@@ -438,6 +438,7 @@ async function searchFlights(params) {
                     isLCC: response.Response.IsLCC,
                     isRefundable: response.Response.IsRefundable,
                     currency: params.currency || CONFIG.DEFAULT_CURRENCY,
+                    // In the response preparation section, update the searchParams to use the original journey_type
                     searchParams: {
                         origin: params.origin,
                         destination: params.destination,
@@ -447,7 +448,7 @@ async function searchFlights(params) {
                         children: childCount,
                         infants: infantCount,
                         cabinClass: params.travelclass || CONFIG.DEFAULT_CABIN_CLASS,
-                        journeyType: journeyType === 2 ? 'roundtrip' : 'oneway'
+                        journeyType: params.journey_type === 2 ? 'roundtrip' : 'oneway'
                     },
                     metadata: {
                         responseTime: `${Date.now() - startTime}ms`,
