@@ -402,6 +402,21 @@ async function searchFlights(params) {
             const results = Array.isArray(response.Response.Results)
                 ? response.Response.Results 
                 : response.Response.Results ? [response.Response.Results] : [];
+            
+            // Separate outbound and return flights
+            const outboundFlights = [];
+            const returnFlights = [];
+
+            results.forEach(flight => {
+                if (flight.Segments && flight.Segments.length > 0) {
+                    const isReturnFlight = flight.Segments[0].Origin === params.destination;
+                    if (isReturnFlight) {
+                        returnFlights.push(flight);
+                    } else {
+                        outboundFlights.push(flight);
+                    }
+                }
+            });
 
             // Log search completion
             logMessage(
@@ -415,7 +430,8 @@ async function searchFlights(params) {
                 success: true,
                 searchId,
                 data: {
-                    results: results.slice(0, maxResults),
+                    outbound: outboundFlights.slice(0, maxResults),
+                    return: returnFlights.slice(0, maxResults),
                     traceId: response.Response.TraceId,
                     resultIndex: results[0]?.ResultIndex,
                     isDomestic: response.Response.IsDomestic,
@@ -430,15 +446,15 @@ async function searchFlights(params) {
                         adults: adultCount,
                         children: childCount,
                         infants: infantCount,
-                        cabinClass: params.travelclass || CONFIG.DEFAULT_CABIN_CLASS
+                        cabinClass: params.travelclass || CONFIG.DEFAULT_CABIN_CLASS,
+                        journeyType: journeyType === 2 ? 'roundtrip' : 'oneway'
                     },
                     metadata: {
-                        responseTime: `${responseTime}ms`,
+                        responseTime: `${Date.now() - startTime}ms`,
                         timestamp: new Date().toISOString()
                     }
                 }
             };
-
             return result;
         }
 
