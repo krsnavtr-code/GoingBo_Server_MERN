@@ -396,80 +396,16 @@ async function searchFlights(params) {
         // Make the API call
         const response = await makeRequest('Search', requestData);
         const responseTime = Date.now() - startTime;
-        
-        // Log the full response for debugging
-        console.log('Raw API response:', JSON.stringify(response, null, 2));
 
         // Process the response
         if (response && response.Response) {
-            let results = [];
-
-            // Check if we have results in the expected format
-            if (response.Response.Results) {
-                results = Array.isArray(response.Response.Results)
-                    ? response.Response.Results 
-                    : [response.Response.Results];
-
-                console.log(`Found ${results.length} flight results in response`);
-
-                // Log first result details if available
-                if (results.length > 0) {
-                    console.log('First result structure:', {
-                        hasSegments: !!results[0].Segments,
-                        segmentCount: Array.isArray(results[0].Segments) ? results[0].Segments.length : 'N/A',
-                        keys: Object.keys(results[0])
-                    });
-                }
-            } else {
-                console.warn('No flight results in API response. Response structure:', {
-                    hasResponse: !!response,
-                    hasResponseResponse: !!response.Response,
-                    responseKeys: response ? Object.keys(response) : [],
-                    responseResponseKeys: response?.Response ? Object.keys(response.Response) : []
-                });
-            }
-
-            // For round-trip, separate outbound and return flights
-            let outboundFlights = [];
-            let returnFlights = [];
-            const isRoundTrip = journeyType === 2;
-
-            console.log(`Processing ${results.length} flights, isRoundTrip: ${isRoundTrip}`);
-
-            results.forEach(flight => {
-                if (!flight || !flight.Segments) return;
-
-                // Check if this is a round-trip with nested segments
-                if (isRoundTrip && Array.isArray(flight.Segments[0])) {
-                    // First array is outbound, second is return
-                    const outboundSegment = flight.Segments[0][0];
-                    const returnSegment = flight.Segments[1]?.[0];
-
-                    if (outboundSegment) {
-                        outboundFlights.push({
-                            ...flight,
-                            Segments: [outboundSegment],
-                            IsOutbound: true
-                        });
-                    }
-
-                    if (returnSegment) {
-                        returnFlights.push({
-                            ...flight,
-                            Segments: [returnSegment],
-                            IsReturn: true
-                        });
-                    }
-                } else {
-                    // One-way or standard format
-                    outboundFlights.push(flight);
-                }
-            });
+            const results = Array.isArray(response.Response.Results)
+                ? response.Response.Results 
+                : response.Response.Results ? [response.Response.Results] : [];
 
             // Log search completion
             logMessage(
-                `[${searchId}] Search completed in ${responseTime}ms. ` +
-                `Found ${outboundFlights.length} outbound and ${returnFlights.length} return flights.`,
+                `[${searchId}] Search completed in ${responseTime}ms. Found ${results.length} results.`,
                 null,
                 'info'
             );
@@ -479,9 +415,7 @@ async function searchFlights(params) {
                 success: true,
                 searchId,
                 data: {
-                    isRoundTrip,
-                    outbound: outboundFlights.slice(0, maxResults),
-                    return: returnFlights.slice(0, maxResults),
+                    results: results.slice(0, maxResults),
                     traceId: response.Response.TraceId,
                     resultIndex: results[0]?.ResultIndex,
                     isDomestic: response.Response.IsDomestic,
@@ -508,47 +442,7 @@ async function searchFlights(params) {
             return result;
         }
 
-        const errorMessage = response?.Response?.Error?.ErrorMessage || 'No flight results found for the given criteria';
-        console.error('Flight search failed:', {
-            error: errorMessage,
-            response: response?.Response,
-            request: {
-                origin: params.origin,
-                destination: params.destination,
-                departure_date: params.departure_date,
-                journey_type: journeyType,
-                adultCount,
-                childCount,
-                infantCount
-            }
-        });
-
-        // Return empty results instead of throwing an error
-        return {
-            success: true,
-            searchId,
-            data: {
-                isRoundTrip: journeyType === 2,
-                outbound: [],
-                return: [],
-                traceId: response?.Response?.TraceId || '',
-                searchParams: {
-                    origin: params.origin,
-                    destination: params.destination,
-                    departureDate: params.departure_date,
-                    returnDate: params.return_date,
-                    adults: adultCount,
-                    children: childCount,
-                    infants: infantCount,
-                    cabinClass: params.travelclass || CONFIG.DEFAULT_CABIN_CLASS
-                },
-                metadata: {
-                    responseTime: `${Date.now() - startTime}ms`,
-                    timestamp: new Date().toISOString(),
-                    message: errorMessage
-                }
-            }
-        };
+        throw new Error(response?.Response?.Error?.ErrorMessage || 'No results found');
     } catch (error) {
         const errorTime = Date.now() - startTime;
         const errorDetails = {
