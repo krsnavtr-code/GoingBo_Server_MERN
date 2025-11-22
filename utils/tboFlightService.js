@@ -294,7 +294,7 @@ async function searchFlights(params) {
         const adultCount = Math.min(Math.max(parseInt(params.adults) || 1, 1), 9);
         const childCount = Math.min(Math.max(parseInt(params.children) || 0, 0), 9);
         const infantCount = Math.min(Math.max(parseInt(params.infants) || 0, 0), 9);
-        const journeyType = parseInt(params.journey_type) === 2 ? 2 : 1;
+        const journeyType = (parseInt(params.journey_type) === 2 || params.journey_type === '2') ? 2 : 1;
         const maxResults = Math.min(Math.max(parseInt(params.maxResults) || 100, 1), 100);
 
         // Validate passenger configuration
