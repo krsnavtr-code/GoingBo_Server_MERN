@@ -448,7 +448,7 @@ async function searchFlights(params) {
                         children: childCount,
                         infants: infantCount,
                         cabinClass: params.travelclass || CONFIG.DEFAULT_CABIN_CLASS,
-                        journeyType: params.journey_type === 2 ? 'roundtrip' : 'oneway'
+                        journeyType: parseInt(params.journey_type) === 2 ? 'roundtrip' : 'oneway'
                     },
                     metadata: {
                         responseTime: `${Date.now() - startTime}ms`,
