@@ -60,12 +60,16 @@ function saveToken(token) {
     try {
         const tokenData = {
             ...token,
-            timestamp: new Date().toISOString()  // Add timestamp when token is saved
+            timestamp: new Date().toISOString()
         };
+        // Ensure the directory exists
+        if (!fs.existsSync(AUTH_CONFIG.logDir)) {
+            fs.mkdirSync(AUTH_CONFIG.logDir, { recursive: true });
+        }
         fs.writeFileSync(AUTH_CONFIG.tokenFile, JSON.stringify(tokenData, null, 2));
-        log("🔑 Token saved successfully");
+        console.log('🔑 Token saved successfully');
     } catch (error) {
-        log("❌ Error saving token:", error.message);
+        console.error('❌ Error saving token:', error.message);
         throw error;
     }
 }
@@ -73,15 +77,15 @@ function saveToken(token) {
 // =============================
 // AUTHENTICATION
 // =============================
-export async function getAuthToken() {
+export async function getAuthToken(forceRefresh = false) {
     try {
-        // Always try to load token first
-        const cachedToken = loadToken();
-        if (cachedToken) {
-            return cachedToken;
+        // If not forcing refresh, try to load from cache first
+        if (!forceRefresh) {
+            const cached = loadToken();
+            if (cached) return cached;
         }
 
-        log("🔑 Getting new TBO authentication token...");
+        console.log('🔑 Getting new TBO authentication token...');
 
         const response = await axios.post(
             `${AUTH_CONFIG.baseSharedUrl}Authenticate`,
@@ -93,26 +97,28 @@ export async function getAuthToken() {
             },
             {
                 headers: {
-                    "Content-Type": "application/json"
+                    'Content-Type': 'application/json'
                 },
                 timeout: AUTH_CONFIG.timeout
             }
         );
 
-        if (response.data?.TokenId) {
+        console.log('Auth response:', JSON.stringify(response.data, null, 2));
+
+        if (response.data && response.data.TokenId) {
             const tokenData = {
                 ...response.data,
                 timestamp: new Date().toISOString()
             };
             saveToken(tokenData);
-            log("✅ Authentication successful");
+            console.log('✅ Authentication successful');
             return tokenData;
         }
 
-        throw new Error("Invalid response from TBO API");
+        throw new Error('Invalid response from TBO API: ' + JSON.stringify(response.data));
 
     } catch (error) {
-        log("❌ Authentication failed:", error.message);
+        console.error('❌ Authentication failed:', error.message);
         throw new Error(`TBO Authentication failed: ${error.message}`);
     }
 }

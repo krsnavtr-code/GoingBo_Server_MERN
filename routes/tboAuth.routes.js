@@ -103,8 +103,11 @@ router.post('/search-flights', async (req, res) => {
                 return response.data;
             } catch (error) {
                 // If token is invalid and we haven't retried yet, try one more time
+                // In the search endpoint, update the error handling:
                 if (error.response?.data?.Response?.Error?.ErrorCode === 6 && retryCount > 0) {
-                    console.log('Token expired, retrying with fresh token...');
+                    console.log('Token expired, forcing token refresh...');
+                    // Force a fresh token by passing true
+                    const freshAuthData = await getAuthToken(true);
                     return performSearch(retryCount - 1);
                 }
                 throw error;
