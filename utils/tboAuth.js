@@ -114,17 +114,23 @@ export async function getAuthToken(forceRefresh = false) {
 
         console.log('Auth response:', JSON.stringify(response.data, null, 2));
 
-        if (response.data && response.data.TokenId) {
-            const tokenData = {
-                ...response.data,
-                timestamp: new Date().toISOString()
-            };
-            saveToken(tokenData);
-            console.log('✅ Authentication successful');
-            return tokenData;
+        if (response.data) {
+            if (response.data.Status === 1 && response.data.TokenId) {
+                const tokenData = {
+                    ...response.data,
+                    timestamp: new Date().toISOString()
+                };
+                saveToken(tokenData);
+                console.log('✅ Authentication successful');
+                return tokenData;
+            } else if (response.data.Error) {
+                const errorMsg = `TBO Authentication Error ${response.data.Error.ErrorCode}: ${response.data.Error.ErrorMessage}`;
+                console.error('❌', errorMsg);
+                throw new Error(errorMsg);
+            }
         }
 
-        throw new Error('Invalid response from TBO API: ' + JSON.stringify(response.data));
+        throw new Error('Invalid response format from TBO API: ' + JSON.stringify(response.data));
 
     } catch (error) {
         console.error('❌ Authentication failed:', error.message);
