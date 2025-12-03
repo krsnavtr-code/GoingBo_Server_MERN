@@ -51,30 +51,26 @@ router.post('/search-flights', async (req, res) => {
                     AdultCount: String(adults || 1),
                     ChildCount: String(children || 0),
                     InfantCount: String(infants || 0),
-                    DirectFlight: 'false',
-                    OneStopFlight: 'false',
-                    JourneyType: returnDate ? '2' : '1',
-                    PreferredAirlines: null,
+                    DirectFlight: false,  // Changed from string to boolean
+                    OneStopFlight: false, // Changed from string to boolean
+                    JourneyType: returnDate ? 2 : 1,  // Changed to number
+                    PreferredAirlines: [],
                     Segments: [
                         {
                             Origin: origin,
                             Destination: destination,
                             FlightCabinClass: cabinClass || '1',
-                            PreferredDepartureTime: `${departureDate}T00:00:00`,
-                            PreferredArrivalTime: `${departureDate}T23:59:59`
+                            PreferredDepartureTime: `${departureDate}T00:00:00`
                         }
-                    ],
-                    Sources: null
+                    ]
                 };
 
-                // Add return segment for round-trip
                 if (returnDate) {
                     searchParams.Segments.push({
                         Origin: destination,
                         Destination: origin,
                         FlightCabinClass: cabinClass || '1',
-                        PreferredDepartureTime: `${returnDate}T00:00:00`,
-                        PreferredArrivalTime: `${returnDate}T23:59:59`
+                        PreferredDepartureTime: `${returnDate}T00:00:00`
                     });
                 }
 
@@ -82,14 +78,20 @@ router.post('/search-flights', async (req, res) => {
 
                 // Make the flight search request to TBO API
                 const response = await axios.post(
-                    'http://api.tektravels.com/BookingEngineService_Air/AirService.svc/rest/Search',
-                    searchParams,
+                    'http://api.tektravels.com/SharedAPI/SharedData.svc/rest/Search',
+                    {
+                        ...searchParams,
+                        // Ensure these fields are in the root of the request
+                        TokenId: authData.TokenId,
+                        EndUserIp: req.ip || '192.168.1.1'
+                    },
                     {
                         headers: {
                             'Content-Type': 'application/json',
                             'Accept': 'application/json',
+                            'Authorization': `Bearer ${authData.TokenId}`  // Add this line
                         },
-                        timeout: 30000 // 30 seconds timeout
+                        timeout: 30000
                     }
                 );
 
