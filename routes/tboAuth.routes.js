@@ -48,29 +48,33 @@ router.post('/search-flights', async (req, res) => {
                 const searchParams = {
                     EndUserIp: req.ip || '192.168.1.1',
                     TokenId: authData.TokenId,
-                    AdultCount: String(adults || 1),
-                    ChildCount: String(children || 0),
-                    InfantCount: String(infants || 0),
-                    DirectFlight: false,  // Changed from string to boolean
-                    OneStopFlight: false, // Changed from string to boolean
-                    JourneyType: returnDate ? 2 : 1,  // Changed to number
-                    PreferredAirlines: [],
+                    AdultCount: parseInt(adults) || 1,
+                    ChildCount: parseInt(children) || 0,
+                    InfantCount: parseInt(infants) || 0,
+                    DirectFlight: false,
+                    OneStopFlight: false,
+                    JourneyType: returnDate ? 2 : 1,  // 1 for OneWay, 2 for Return
+                    PreferredAirlines: null,
                     Segments: [
                         {
                             Origin: origin,
                             Destination: destination,
-                            FlightCabinClass: cabinClass || '1',
-                            PreferredDepartureTime: `${departureDate}T00:00:00`
+                            FlightCabinClass: cabinClass || '2',  // 2 for Economy
+                            PreferredDepartureTime: `${departureDate}T00:00:00`,
+                            PreferredArrivalTime: `${departureDate}T23:59:59`
                         }
-                    ]
+                    ],
+                    Sources: ['GDS']  // For Amadeus/Galileo
                 };
 
+                // Add return segment for round-trip
                 if (returnDate) {
                     searchParams.Segments.push({
                         Origin: destination,
                         Destination: origin,
-                        FlightCabinClass: cabinClass || '1',
-                        PreferredDepartureTime: `${returnDate}T00:00:00`
+                        FlightCabinClass: cabinClass || '2',
+                        PreferredDepartureTime: `${returnDate}T00:00:00`,
+                        PreferredArrivalTime: `${returnDate}T23:59:59`
                     });
                 }
 
@@ -78,20 +82,14 @@ router.post('/search-flights', async (req, res) => {
 
                 // Make the flight search request to TBO API
                 const response = await axios.post(
-                    'http://api.tektravels.com/SharedAPI/SharedData.svc/rest/Search',
-                    {
-                        ...searchParams,
-                        // Ensure these fields are in the root of the request
-                        TokenId: authData.TokenId,
-                        EndUserIp: req.ip || '192.168.1.1'
-                    },
+                    'http://api.tektravels.com/BookingEngineService_Air/AirService.svc/rest/Search',
+                    searchParams,
                     {
                         headers: {
                             'Content-Type': 'application/json',
-                            'Accept': 'application/json',
-                            'Authorization': `Bearer ${authData.TokenId}`  // Add this line
+                            'Accept': 'application/json'
                         },
-                        timeout: 30000
+                        timeout: 30000 // 30 seconds timeout
                     }
                 );
 
