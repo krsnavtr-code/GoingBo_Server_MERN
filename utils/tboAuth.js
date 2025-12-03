@@ -8,10 +8,10 @@ import path from "path";
 const AUTH_CONFIG = {
     username: process.env.TBO_USERNAME || "DELG738",
     password: process.env.TBO_PASSWORD || "Htl@DEL#38/G",
-    clientId: "tboprod", // Fixed as per documentation
+    clientId: "tboprod",
     endUserIp: process.env.TBO_END_USER_IP || "82.112.236.83",
-    // baseSharedUrl: "http://Sharedapi.tektravels.com/SharedData.svc/rest/",
-    baseSharedUrl: "https://api.travelboutiqueonline.com/SharedAPI/SharedData.svc/rest/",
+    // baseSharedUrl: "http://Sharedapi.tektravels.com/SharedData.svc/rest/",  // new
+    baseSharedUrl: "https://api.travelboutiqueonline.com/SharedAPI/SharedData.svc/rest/",   // old
     logDir: path.join(process.cwd(), "logs/TBO/auth"),
     tokenFile: path.join(process.cwd(), "logs/TBO/auth/token.json"),
     timeout: 20000

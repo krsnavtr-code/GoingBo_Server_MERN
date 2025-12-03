@@ -11,8 +11,8 @@ const __dirname = path.dirname(__filename);
 // Configuration
 const CONFIG = {
     // Base URLs
-    FLIGHT_URL_1: 'https://tboapi.travelboutiqueonline.com/AirAPI_V10/AirService.svc/rest/',
-    FLIGHT_URL_2: 'https://booking.travelboutiqueonline.com/AirAPI_V10/AirService.svc/rest/',
+    FLIGHT_URL_1: 'http://api.tektravels.com/BookingEngineService_Air/AirService.svc/rest/',
+    FLIGHT_URL_2: 'http://api.tektravels.com/BookingEngineService_Air/AirService.svc/rest/',
     
     // Logging
     LOG_DIR: path.join(__dirname, '../../logs/TBO/flights'),
@@ -21,10 +21,37 @@ const CONFIG = {
     TIMEOUT: 30000,
 
     // Default values
-    DEFAULT_CABIN_CLASS: '2', // 2: Economy, 3: Premium Economy, 4: Business, etc.
+    DEFAULT_CABIN_CLASS: '2', // 1: All, 2: Economy, 3: Premium Economy, 4: Business, 5: Premium Business, 6: First
     DEFAULT_CURRENCY: 'INR',
     MAX_RETRIES: 3,
-    RETRY_DELAY: 1000 // 1 second
+    RETRY_DELAY: 1000, // 1 second
+
+    // Journey Types
+    JOURNEY_TYPES: {
+        ONE_WAY: 1,
+        ROUND_TRIP: 2,
+        MULTI_STOP: 3,
+        ADVANCE_SEARCH: 4,
+        SPECIAL_RETURN: 5
+    },
+
+    // Cabin Classes
+    CABIN_CLASSES: {
+        ALL: '1',
+        ECONOMY: '2',
+        PREMIUM_ECONOMY: '3',
+        BUSINESS: '4',
+        PREMIUM_BUSINESS: '5',
+        FIRST: '6'
+    },
+
+    // Result Fare Types
+    FARE_TYPES: {
+        REGULAR: 2,
+        STUDENT: 3,
+        ARMED_FORCE: 4,
+        SENIOR_CITIZEN: 5
+    }
 };
 
 // Ensure log directory exists
@@ -219,10 +246,12 @@ async function makeRequest(endpoint, data, useSecondaryUrl = false, attempt = 1)
  * @param {string} destination - Destination airport code (3-letter IATA code)
  * @param {string|number} [cabinClass] - Cabin class (1-6, defaults to 2 for Economy)
  * @param {string} date - Departure date (YYYY-MM-DD)
+ * @param {string} [preferredDepartureTime] - Preferred departure time (HH:mm:ss)
+ * @param {string} [preferredArrivalTime] - Preferred arrival time (HH:mm:ss)
  * @returns {Object} Flight segment
  * @throws {Error} If validation fails
  */
-function createFlightSegment(origin, destination, cabinClass = CONFIG.DEFAULT_CABIN_CLASS, date) {
+function createFlightSegment(origin, destination, cabinClass = CONFIG.DEFAULT_CABIN_CLASS, date, preferredDepartureTime = '00:00:00', preferredArrivalTime = '00:00:00') {
     // Validate airport codes
     if (!origin || !destination || typeof origin !== 'string' || typeof destination !== 'string') {
         throw new Error('Origin and destination are required and must be strings');
@@ -340,40 +369,53 @@ async function searchFlights(params) {
                 params.origin,
                 params.destination,
                 params.travelclass,
-                params.departure_date
+                params.departure_date,
+                params.preferred_departure_time || '00:00:00',
+                params.preferred_arrival_time || '00:00:00'
             )
         ];
 
         // Add return segment for round trips
-        if (journeyType === 2 && returnDate) {
+        if ((journeyType === CONFIG.JOURNEY_TYPES.ROUND_TRIP || journeyType === CONFIG.JOURNEY_TYPES.SPECIAL_RETURN) && returnDate) {
             segments.push(
                 createFlightSegment(
                     params.destination,
                     params.origin,
                     params.travelclass,
-                    params.return_date
+                    params.return_date,
+                    params.return_preferred_departure_time || '00:00:00',
+                    params.return_preferred_arrival_time || '00:00:00'
                 )
             );
         }
 
-        // Prepare request payload
-        const requestData = await createParams({
-            AdultCount: adultCount,
-            ChildCount: childCount,
-            InfantCount: infantCount,
-            JourneyType: journeyType,
-            Segments: segments,
-            Sources: null,
-            DirectFlight: Boolean(params.directOnly),
-            OneStopFlight: Boolean(params.oneStopOnly),
-            PreferredAirlines: Array.isArray(params.preferredAirlines) && params.preferredAirlines.length > 0
-                ? params.preferredAirlines.join(',')
-                : null,
-            PreferredCurrency: params.currency || CONFIG.DEFAULT_CURRENCY,
-            ResultCount: maxResults,
-            IsRefundable: params.refundableOnly || false,
-            IsLCC: params.lccOnly || false
-        });
+        // Prepare request data
+        const requestData = {
+            ...(await createParams({
+                AdultCount: adultCount,
+                ChildCount: childCount,
+                InfantCount: infantCount,
+                JourneyType: journeyType,
+                Segments: segments.map(segment => ({
+                    Origin: segment.Origin,
+                    Destination: segment.Destination,
+                    FlightCabinClass: segment.FlightCabinClass,
+                    PreferredDepartureTime: segment.PreferredDepartureTime,
+                    PreferredArrivalTime: segment.PreferredArrivalTime
+                })),
+                PreferredAirlines: Array.isArray(params.preferredAirlines) ?
+                    params.preferredAirlines.filter(Boolean) : null,
+                DirectFlight: params.directOnly || false,
+                OneStopFlight: params.oneStopOnly || false,
+                Sources: params.sources || null,
+                ResultFareType: params.fareType || CONFIG.FARE_TYPES.REGULAR
+            }))
+        };
+
+        // For special return, ensure we have the correct journey type
+        if (params.specialReturn) {
+            requestData.JourneyType = CONFIG.JOURNEY_TYPES.SPECIAL_RETURN;
+        }
 
         // Log the search request
         logMessage(`[${searchId}] Starting flight search: ${params.origin} to ${params.destination} on ${params.departure_date}`, null, 'info');
@@ -393,8 +435,26 @@ async function searchFlights(params) {
             }
         });
 
-        // Make the API call
-        const response = await makeRequest('Search', requestData);
+        // Make the API request
+        const endpoint = 'Search';
+        const response = await makeRequest(endpoint, requestData);
+
+        // Process response for special return if needed
+        if (journeyType === CONFIG.JOURNEY_TYPES.SPECIAL_RETURN) {
+            // Handle special return response
+            response.IsSpecialReturn = true;
+
+            // For domestic special return, we need to combine result indexes
+            if (response.Results && response.Results.length > 0) {
+                response.Results = response.Results.map(result => {
+                    // Mark if this is an LCC flight
+                    result.IsLCC = result.AirlineCode &&
+                        ['6E', 'SG', 'G8', 'G9', 'FZ', 'IX', 'AK', 'LB'].includes(result.AirlineCode);
+                    return result;
+                });
+            }
+        }
+
         const responseTime = Date.now() - startTime;
 
         // Process the response
