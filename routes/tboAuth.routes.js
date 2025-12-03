@@ -43,7 +43,7 @@ router.post('/search-flights', async (req, res) => {
         const performSearch = async (retryCount = 1) => {
             try {
                 // Get a fresh token for each attempt
-                const authData = await getAuthToken();
+                const authData = await getAuthToken(true);
 
                 console.log('Auth Data:', {
                     TokenId: authData.TokenId ? 'Token exists' : 'No token',
