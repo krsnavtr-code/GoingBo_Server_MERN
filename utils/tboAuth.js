@@ -10,7 +10,8 @@ const AUTH_CONFIG = {
     password: process.env.TBO_PASSWORD || "Htl@DEL#38/G",
     clientId: "ApiIntegrationNew", // Fixed as per documentation
     endUserIp: process.env.TBO_END_USER_IP || "82.112.236.83",
-    baseSharedUrl: "http://Sharedapi.tektravels.com/SharedData.svc/rest/",
+    // baseSharedUrl: "http://Sharedapi.tektravels.com/SharedData.svc/rest/",
+    baseSharedUrl: "https://api.travelboutiqueonline.com/SharedAPI/SharedData.svc/rest/",
     logDir: path.join(process.cwd(), "logs/TBO/auth"),
     tokenFile: path.join(process.cwd(), "logs/TBO/auth/token.json"),
     timeout: 20000
