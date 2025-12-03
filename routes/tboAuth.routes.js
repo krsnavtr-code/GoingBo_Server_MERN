@@ -10,10 +10,13 @@ const router = express.Router();
 // @access  Public
 router.get('/auth', async (req, res) => {
   try {
-    const authData = await getAuthToken();
+      const authData = await getAuthToken(true); // Force new token
     res.json({
       success: true,
-      data: authData,
+        Token: authData.TokenId,
+        Status: authData.Status === 1 ? 'Success' : 'Failed',
+        User: authData.Member?.FirstName + ' ' + (authData.Member?.LastName || ''),
+        ...authData // Include all response data
     });
   } catch (error) {
     console.error('TBO Auth Error:', error);
