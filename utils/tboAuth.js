@@ -10,7 +10,8 @@ const AUTH_CONFIG = {
     password: "Htl@DEL#38/G",
     clientId: "tboprod",
     endUserIp: "82.112.236.83",
-    baseSharedUrl: "https://api.travelboutiqueonline.com/SharedAPI/SharedData.svc/rest/",
+    // baseSharedUrl: "https://api.travelboutiqueonline.com/SharedAPI/SharedData.svc/rest/",
+    baseSharedUrl: "http://Sharedapi.tektravels.com/SharedData.svc/rest/",
     logDir: path.join(process.cwd(), "logs/TBO/auth"),
     tokenFile: path.join(process.cwd(), "logs/TBO/auth/token.json"),
     timeout: 20000
