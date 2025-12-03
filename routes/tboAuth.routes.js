@@ -63,7 +63,7 @@ router.post('/search-flights', async (req, res) => {
 
         // Make the flight search request to TBO API
         const response = await axios.post(
-            'https://api.travelboutiqueonline.com/AirAPI_V10/AirService.svc/rest/Search',
+            'https://api.travelboutiqueonline.com/SharedAPI/Flights/Search',
             searchParams,
             {
                 headers: {
