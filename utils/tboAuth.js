@@ -37,11 +37,16 @@ function loadToken() {
     if (fs.existsSync(AUTH_CONFIG.tokenFile)) {
         try {
             const token = JSON.parse(fs.readFileSync(AUTH_CONFIG.tokenFile, "utf8"));
-            const today = new Date().toDateString();
-            const tokenDate = new Date(token.date).toDateString();
-            if (tokenDate === today) {
+            const tokenTime = new Date(token.timestamp).getTime();
+            const currentTime = Date.now();
+            const tokenAgeInMinutes = (currentTime - tokenTime) / (1000 * 60);
+
+            // Token is valid for 14 minutes
+            if (tokenAgeInMinutes < 14) {
                 log("✅ Using cached TBO token");
                 return token;
+            } else {
+                log("ℹ️ Token expired, will generate new one");
             }
         } catch (error) {
             log("❌ Error loading token:", error.message);
@@ -52,9 +57,15 @@ function loadToken() {
 
 function saveToken(token) {
     try {
-        fs.writeFileSync(AUTH_CONFIG.tokenFile, JSON.stringify({ ...token, date: new Date() }, null, 2));
+        const tokenData = {
+            ...token,
+            timestamp: new Date().toISOString()  // Add timestamp when token is saved
+        };
+        fs.writeFileSync(AUTH_CONFIG.tokenFile, JSON.stringify(tokenData, null, 2));
+        log("🔑 Token saved successfully");
     } catch (error) {
         log("❌ Error saving token:", error.message);
+        throw error;
     }
 }
 
@@ -62,33 +73,46 @@ function saveToken(token) {
 // AUTHENTICATION
 // =============================
 export async function getAuthToken() {
-    const cached = loadToken();
-    if (cached) return cached;
-
-    const body = {
-        ClientId: AUTH_CONFIG.clientId,
-        UserName: AUTH_CONFIG.username,
-        Password: AUTH_CONFIG.password,
-        EndUserIp: AUTH_CONFIG.endUserIp
-    };
-
     try {
-        log("🔐 Authenticating...");
-        const res = await axios.post(`${AUTH_CONFIG.baseSharedUrl}Authenticate`, body, {
-            headers: { "Content-Type": "application/json" },
-            timeout: AUTH_CONFIG.timeout
-        });
-
-        if (res.data?.TokenId) {
-            saveToken(res.data);
-            log("✅ Token fetched successfully");
-            return res.data;
+        // Always try to load token first
+        const cachedToken = loadToken();
+        if (cachedToken) {
+            return cachedToken;
         }
 
-        throw new Error(res.data?.Error?.ErrorMessage || "Authentication failed");
-    } catch (err) {
-        log("❌ Auth Error", err.message);
-        throw err;
+        log("🔑 Getting new TBO authentication token...");
+
+        const response = await axios.post(
+            `${AUTH_CONFIG.baseSharedUrl}Authenticate`,
+            {
+                ClientId: AUTH_CONFIG.clientId,
+                UserName: AUTH_CONFIG.username,
+                Password: AUTH_CONFIG.password,
+                EndUserIp: AUTH_CONFIG.endUserIp
+            },
+            {
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                timeout: AUTH_CONFIG.timeout
+            }
+        );
+
+        if (response.data?.TokenId) {
+            const tokenData = {
+                ...response.data,
+                timestamp: new Date().toISOString()
+            };
+            saveToken(tokenData);
+            log("✅ Authentication successful");
+            return tokenData;
+        }
+
+        throw new Error("Invalid response from TBO API");
+
+    } catch (error) {
+        log("❌ Authentication failed:", error.message);
+        throw new Error(`TBO Authentication failed: ${error.message}`);
     }
 }
 
