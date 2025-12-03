@@ -110,7 +110,7 @@ function logMessage(message, logFilename = null, level = 'info') {
  */
 async function createParams(params = {}, attempt = 1) {
     try {
-        const token = await getAuthToken();
+        const token = await getAuthToken(true);
         if (!token || !token.TokenId) {
             throw new Error('Invalid or missing authentication token');
         }
