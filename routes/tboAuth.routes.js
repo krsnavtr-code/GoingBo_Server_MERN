@@ -1,6 +1,7 @@
 import express from 'express';
 import axios from 'axios';
-import { getAuthToken } from '../utils/tboAuth.js';
+import tboAuth from '../utils/tboAuth.js';
+const { getAuthToken, loadToken } = tboAuth;
 
 const router = express.Router();
 

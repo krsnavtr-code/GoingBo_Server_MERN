@@ -132,6 +132,9 @@ export async function getAuthToken(forceRefresh = false) {
     }
 }
 
+// Export as default object
 export default {
-    getAuthToken
+    getAuthToken,
+    loadToken,
+    saveToken
 };
