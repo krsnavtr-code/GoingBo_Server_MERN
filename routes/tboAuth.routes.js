@@ -43,24 +43,37 @@ router.post('/search-flights', async (req, res) => {
 
         // Prepare the request payload
         const searchParams = {
+            EndUserIp: req.ip || '192.168.1.1',
             TokenId: authData.TokenId,
-            Origin: origin,
-            Destination: destination,
-            DepartureDate: departureDate,
-            ReturnDate: returnDate || '',
-            Adults: adults || 1,
-            Childs: children || 0,
-            Infants: infants || 0,
-            PreferredAirlines: [],
-            JourneyType: returnDate ? 2 : 1, // 1 for one-way, 2 for round-trip
-            CabinClass: cabinClass || '2', // 2 for Economy
-            DirectFlight: false,
-            OneStopFlight: false,
-            PreferredDepartureTime: '',
-            PreferredArrivalTime: '',
-            AllFlights: true,
+            AdultCount: String(adults || 1),
+            ChildCount: String(children || 0),
+            InfantCount: String(infants || 0),
+            DirectFlight: 'false',
+            OneStopFlight: 'false',
+            JourneyType: returnDate ? '2' : '1',
+            PreferredAirlines: null,
+            Segments: [
+                {
+                    Origin: origin,
+                    Destination: destination,
+                    FlightCabinClass: cabinClass || '1',
+                    PreferredDepartureTime: `${departureDate}T00:00:00`,
+                    PreferredArrivalTime: `${departureDate}T23:59:59`
+                }
+            ],
+            Sources: null
         };
 
+        if (returnDate) {
+            searchParams.Segments.push({
+                Origin: destination,
+                Destination: origin,
+                FlightCabinClass: cabinClass || '1',
+                PreferredDepartureTime: `${returnDate}T00:00:00`,
+                PreferredArrivalTime: `${returnDate}T23:59:59`
+            });
+        }
+        
         // Make the flight search request to TBO API
         const response = await axios.post(
             'http://api.tektravels.com/BookingEngineService_Air/AirService.svc/rest/Search',
