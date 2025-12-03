@@ -38,57 +38,78 @@ router.post('/search-flights', async (req, res) => {
             });
         }
 
-        // Get authentication token first
-        const authData = await getAuthToken();
+        // Function to perform flight search with retry logic
+        const performSearch = async (retryCount = 1) => {
+            try {
+                // Get a fresh token for each attempt
+                const authData = await getAuthToken();
 
-        // Prepare the request payload
-        const searchParams = {
-            EndUserIp: req.ip || '192.168.1.1',
-            TokenId: authData.TokenId,
-            AdultCount: String(adults || 1),
-            ChildCount: String(children || 0),
-            InfantCount: String(infants || 0),
-            DirectFlight: 'false',
-            OneStopFlight: 'false',
-            JourneyType: returnDate ? '2' : '1',
-            PreferredAirlines: null,
-            Segments: [
-                {
-                    Origin: origin,
-                    Destination: destination,
-                    FlightCabinClass: cabinClass || '1',
-                    PreferredDepartureTime: `${departureDate}T00:00:00`,
-                    PreferredArrivalTime: `${departureDate}T23:59:59`
+                // Prepare the request payload according to TBO API format
+                const searchParams = {
+                    EndUserIp: req.ip || '192.168.1.1',
+                    TokenId: authData.TokenId,
+                    AdultCount: String(adults || 1),
+                    ChildCount: String(children || 0),
+                    InfantCount: String(infants || 0),
+                    DirectFlight: 'false',
+                    OneStopFlight: 'false',
+                    JourneyType: returnDate ? '2' : '1',
+                    PreferredAirlines: null,
+                    Segments: [
+                        {
+                            Origin: origin,
+                            Destination: destination,
+                            FlightCabinClass: cabinClass || '1',
+                            PreferredDepartureTime: `${departureDate}T00:00:00`,
+                            PreferredArrivalTime: `${departureDate}T23:59:59`
+                        }
+                    ],
+                    Sources: null
+                };
+
+                // Add return segment for round-trip
+                if (returnDate) {
+                    searchParams.Segments.push({
+                        Origin: destination,
+                        Destination: origin,
+                        FlightCabinClass: cabinClass || '1',
+                        PreferredDepartureTime: `${returnDate}T00:00:00`,
+                        PreferredArrivalTime: `${returnDate}T23:59:59`
+                    });
                 }
-            ],
-            Sources: null
+
+                console.log('Sending search request with token:', authData.TokenId);
+
+                // Make the flight search request to TBO API
+                const response = await axios.post(
+                    'http://api.tektravels.com/BookingEngineService_Air/AirService.svc/rest/Search',
+                    searchParams,
+                    {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                        },
+                        timeout: 30000 // 30 seconds timeout
+                    }
+                );
+
+                return response.data;
+            } catch (error) {
+                // If token is invalid and we haven't retried yet, try one more time
+                if (error.response?.data?.Response?.Error?.ErrorCode === 6 && retryCount > 0) {
+                    console.log('Token expired, retrying with fresh token...');
+                    return performSearch(retryCount - 1);
+                }
+                throw error;
+            }
         };
 
-        if (returnDate) {
-            searchParams.Segments.push({
-                Origin: destination,
-                Destination: origin,
-                FlightCabinClass: cabinClass || '1',
-                PreferredDepartureTime: `${returnDate}T00:00:00`,
-                PreferredArrivalTime: `${returnDate}T23:59:59`
-            });
-        }
-        
-        // Make the flight search request to TBO API
-        const response = await axios.post(
-            'http://api.tektravels.com/BookingEngineService_Air/AirService.svc/rest/Search',
-            searchParams,
-            {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                },
-            }
-        );
+        // Perform the search with one retry attempt
+        const searchResult = await performSearch(1);
 
         res.json({
             success: true,
-            data: response.data,
+            data: searchResult,
         });
     } catch (error) {
         console.error('Flight Search Error:', error);
