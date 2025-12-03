@@ -21,6 +21,7 @@ import hotelRoutes from './routes/hotelRoutes.js';
 import faqsRoutes from './routes/faqs.routes.js';
 import dynamicFieldRoutes from './routes/dynamicField.routes.js';
 import cabRoutes from './routes/cab.routes.js';
+import tboAuthRoutes from './routes/tboAuth.routes.js';
 
 // Configure __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -98,6 +99,7 @@ app.use('/api/v1/users', userRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/media', mediaRouter);
 app.use('/api/v1/blog', blogRoutes);
+app.use('/api/v1/tbo', tboAuthRoutes);
 
 app.use('/api/v1', publicRouter);
 app.use('/v1/packages', projectRoutes);
