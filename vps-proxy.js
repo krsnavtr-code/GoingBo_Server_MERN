@@ -45,7 +45,7 @@ const authenticate = (req, res, next) => {
 // ------------------------------
 // TBO Proxy Route
 // ------------------------------
-app.all("/api/*", authenticate, async (req, res) => {
+app.all("/api/:path*", authenticate, async (req, res) => {
     try {
         // Target URL ka accurate transformation
         const tboEndpoint = req.path.replace("/api", "");
