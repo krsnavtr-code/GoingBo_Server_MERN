@@ -83,13 +83,19 @@ router.post('/search-flights', async (req, res) => {
                 // Make the flight search request to TBO API
                 const response = await axios.post(
                     'http://api.tektravels.com/BookingEngineService_Air/AirService.svc/rest/Search',
-                    searchParams,
+                    {
+                        ...searchParams,
+                        // Ensure these fields are in the root of the request
+                        TokenId: authData.TokenId,
+                        EndUserIp: req.ip || '192.168.1.1'
+                    },
                     {
                         headers: {
                             'Content-Type': 'application/json',
-                            'Accept': 'application/json'
+                            'Accept': 'application/json',
+                            'Authorization': `Bearer ${authData.TokenId}`  // Add this line
                         },
-                        timeout: 30000 // 30 seconds timeout
+                        timeout: 30000
                     }
                 );
 
