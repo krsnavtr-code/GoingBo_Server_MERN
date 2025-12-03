@@ -44,9 +44,15 @@ router.post('/search-flights', async (req, res) => {
                 // Get a fresh token for each attempt
                 const authData = await getAuthToken();
 
+                console.log('Auth Data:', {
+                    TokenId: authData.TokenId ? 'Token exists' : 'No token',
+                    TokenLength: authData.TokenId?.length || 0,
+                    IsFreshToken: !loadToken() ? 'Fresh token' : 'Cached token'
+                });
+
                 // Prepare the request payload according to TBO API format
                 const searchParams = {
-                    EndUserIp: req.ip || '192.168.1.1',
+                    EndUserIp: req.ip || '82.112.236.83',
                     TokenId: authData.TokenId,
                     AdultCount: parseInt(adults) || 1,
                     ChildCount: parseInt(children) || 0,
@@ -61,7 +67,7 @@ router.post('/search-flights', async (req, res) => {
                             Destination: destination,
                             FlightCabinClass: cabinClass || '2',  // 2 for Economy
                             PreferredDepartureTime: `${departureDate}T00:00:00`,
-                            PreferredArrivalTime: `${departureDate}T23:59:59`
+                            // PreferredArrivalTime: `${departureDate}T23:59:59`
                         }
                     ],
                     Sources: ['GDS']  // For Amadeus/Galileo
@@ -74,7 +80,7 @@ router.post('/search-flights', async (req, res) => {
                         Destination: origin,
                         FlightCabinClass: cabinClass || '2',
                         PreferredDepartureTime: `${returnDate}T00:00:00`,
-                        PreferredArrivalTime: `${returnDate}T23:59:59`
+                        // PreferredArrivalTime: `${returnDate}T23:59:59`
                     });
                 }
 
@@ -83,17 +89,12 @@ router.post('/search-flights', async (req, res) => {
                 // Make the flight search request to TBO API
                 const response = await axios.post(
                     'http://api.tektravels.com/BookingEngineService_Air/AirService.svc/rest/Search',
-                    {
-                        ...searchParams,
-                        // Ensure these fields are in the root of the request
-                        TokenId: authData.TokenId,
-                        EndUserIp: req.ip || '192.168.1.1'
-                    },
+                    searchParams,
                     {
                         headers: {
                             'Content-Type': 'application/json',
                             'Accept': 'application/json',
-                            'Authorization': `Bearer ${authData.TokenId}`  // Add this line
+                            'Authorization': `Bearer ${authData.TokenId}` 
                         },
                         timeout: 30000
                     }
