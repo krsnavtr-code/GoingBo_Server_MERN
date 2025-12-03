@@ -6,11 +6,10 @@ import path from "path";
 // CONFIGURATION
 // =============================
 const AUTH_CONFIG = {
-    username: "DELG738",
-    password: "Htl@DEL#38/G",
-    clientId: "tboprod",
-    endUserIp: "82.112.236.83",
-    // baseSharedUrl: "https://api.travelboutiqueonline.com/SharedAPI/SharedData.svc/rest/",
+    username: process.env.TBO_USERNAME || "DELG738",
+    password: process.env.TBO_PASSWORD || "Htl@DEL#38/G",
+    clientId: "ApiIntegrationNew", // Fixed as per documentation
+    endUserIp: process.env.TBO_END_USER_IP || "82.112.236.83",
     baseSharedUrl: "http://Sharedapi.tektravels.com/SharedData.svc/rest/",
     logDir: path.join(process.cwd(), "logs/TBO/auth"),
     tokenFile: path.join(process.cwd(), "logs/TBO/auth/token.json"),
@@ -38,16 +37,19 @@ function loadToken() {
     if (fs.existsSync(AUTH_CONFIG.tokenFile)) {
         try {
             const token = JSON.parse(fs.readFileSync(AUTH_CONFIG.tokenFile, "utf8"));
-            const tokenTime = new Date(token.timestamp).getTime();
-            const currentTime = Date.now();
-            const tokenAgeInMinutes = (currentTime - tokenTime) / (1000 * 60);
+            const tokenDate = new Date(token.timestamp);
+            const currentDate = new Date();
 
-            // Token is valid for 14 minutes
-            if (tokenAgeInMinutes < 14) {
+            // Check if token is from today (valid for 24 hours from 00:00 to 23:59)
+            const isSameDay = tokenDate.getDate() === currentDate.getDate() &&
+                tokenDate.getMonth() === currentDate.getMonth() &&
+                tokenDate.getFullYear() === currentDate.getFullYear();
+
+            if (isSameDay) {
                 log("✅ Using cached TBO token");
                 return token;
             } else {
-                log("ℹ️ Token expired, will generate new one");
+                log("ℹ️ Token expired (new day), will generate new one");
             }
         } catch (error) {
             log("❌ Error loading token:", error.message);
@@ -87,21 +89,28 @@ export async function getAuthToken(forceRefresh = false) {
 
         console.log('🔑 Getting new TBO authentication token...');
 
+        const requestData = {
+            ClientId: AUTH_CONFIG.clientId,
+            UserName: AUTH_CONFIG.username,
+            Password: AUTH_CONFIG.password,
+            EndUserIp: AUTH_CONFIG.endUserIp
+        };
+
+        log("Sending auth request:", requestData);
+
         const response = await axios.post(
             `${AUTH_CONFIG.baseSharedUrl}Authenticate`,
-            {
-                ClientId: AUTH_CONFIG.clientId,
-                UserName: AUTH_CONFIG.username,
-                Password: AUTH_CONFIG.password,
-                EndUserIp: AUTH_CONFIG.endUserIp
-            },
+            requestData,
             {
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
                 },
                 timeout: AUTH_CONFIG.timeout
             }
         );
+
+        log("Auth response received:", response.data);
 
         console.log('Auth response:', JSON.stringify(response.data, null, 2));
 
